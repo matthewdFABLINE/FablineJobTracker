@@ -137,7 +137,7 @@ if "jobs" not in st.session_state:
 
 # 5. Core Interface Heading & Statistics Panel
 st.title("⚙️ FABLINE CORE")
-st.markdown("<p style='color: #ff6a00; font-weight: bold; letter-spacing: 1.5px; margin-top:-15px;'>PROCUREMENT MONITOR & OPERATIONS TERMINAL</p>", unsafe_html=True)
+st.html("<p style='color: #ff6a00; font-weight: bold; letter-spacing: 1.5px; margin-top:-15px;'>PROCUREMENT MONITOR & OPERATIONS TERMINAL</p>")
 
 total_rec = len(st.session_state.jobs)
 comp_cnt = sum(1 for j in st.session_state.jobs if j.get("status") == "Complete")
