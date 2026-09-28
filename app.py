@@ -77,6 +77,49 @@ st.markdown(
         margin-bottom: 0.2rem !important;
     }
 
+    /* Welcome Hero Banner */
+    .hero-banner {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid var(--border-subtle);
+        border-radius: 14px;
+        padding: 1.75rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .hero-text-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 0.4rem;
+    }
+
+    .hero-text-subtitle {
+        font-size: 0.925rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        max-width: 650px;
+    }
+
+    .brand-chip {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        color: #60a5fa;
+        padding: 0.35rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        margin-top: 0.75rem;
+    }
+
     /* Metric Cards */
     [data-testid="stMetric"] {
         background-color: var(--bg-surface) !important;
@@ -347,23 +390,39 @@ def save_data(data):
 if "jobs" not in st.session_state:
     st.session_state.jobs = load_data()
 
-# Helper to normalize status strings to CSS slug class
+
 def get_status_slug(status_str):
     return str(status_str).lower().replace(" ", "-")
 
-# 5. Header Section & Dashboard Metrics
+
+# 5. Header Section & Formal Welcome Greeting
 st.markdown(
     """
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div class="hero-banner">
         <div>
-            <h1>Fabline Technical Registry</h1>
-            <div style="font-size: 0.9rem; color: var(--text-secondary);">Hardware inventory & shipment tracking portal</div>
+            <div class="hero-text-title">Hello & Welcome to Fabline</div>
+            <div class="hero-text-subtitle">
+                Welcome to Fabline’s primary online registry for material tracking and orders.
+                Log site deliveries, verify pipe fitting requisitions, and audit inventory movements seamlessly across projects.
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="brand-chip">⚙️ High-Purity Piping</span>
+                <span class="brand-chip">🛠️ Precision Fabrication</span>
+                <span class="brand-chip">📋 Quality Assured</span>
+            </div>
+        </div>
+        <div>
+            <img src="https://fabline.ie/wp-content/uploads/2021/04/fabline-logo.png" 
+                 alt="Fabline Engineering Logo" 
+                 style="max-height: 55px; width: auto; opacity: 0.95; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));"
+                 onerror="this.style.display='none'">
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
+# Dashboard Metrics
 total_rec = len(st.session_state.jobs)
 comp_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") == "Complete")
 incomp_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") == "Incomplete")
@@ -379,10 +438,11 @@ m5.metric("Soon to Come", soon_cnt)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-t1, t2, t3 = st.tabs([
+t1, t2, t3, t4 = st.tabs([
     "📋 Master Registry",
     "➕ Archive New Record",
     "🔍 Historical Assistant",
+    "🏢 About Fabline",
 ])
 
 STATUS_OPTIONS = ["Expected", "Soon to come", "Incomplete", "Complete"]
@@ -618,3 +678,19 @@ with t3:
                 """,
                     unsafe_allow_html=True,
                 )
+
+# --- TAB 4: ABOUT FABLINE ---
+with t4:
+    st.markdown("### About Fabline Engineering")
+    st.markdown(
+        """
+    Fabline Engineering specializes in high-purity mechanical piping, stainless steel fabrication, and modular skid manufacturing for pharmaceutical, microelectronics, and heavy industrial sectors.
+
+    #### Key Capabilities & Standards
+    - **High-Purity Process Piping:** Orbital welding and certified cleanroom assembly.
+    - **Modular Skid Fabrication:** Off-site prefabrication reduces installation risk and downtime.
+    - **Quality Assurance & Traceability:** Material certifications, heat numbers, and inspection records logged to this registry.
+    
+    *For full corporate details or official project inquiries, visit [fabline.ie](https://fabline.ie).*
+    """
+    )
