@@ -3,12 +3,14 @@ import json
 import os
 from datetime import datetime
 
+# 1. Page Configuration
 st.set_page_config(
     page_title="Fabline Hub - Cyber Procurement", 
     page_icon="⚙️", 
     layout="centered"
 )
 
+# 2. Cyberpunk Accent Styling Layer
 st.html("""
 <style>
     :root {
@@ -19,6 +21,7 @@ st.html("""
         --text-bright: #ffffff;
         --text-mute: #a4b3a9;
     }
+    
     .stApp {
         background-color: var(--bg-deep) !important;
         color: var(--text-bright) !important;
@@ -28,9 +31,11 @@ st.html("""
         margin: 5px;
         border-radius: 12px;
     }
+    
     p, label, li, span, div, caption {
         font-size: 19px !important;
     }
+    
     input, select, textarea, div[data-baseweb="select"] {
         font-size: 22px !important;
         background-color: var(--bg-deep) !important;
@@ -38,6 +43,7 @@ st.html("""
         border: 2px solid var(--brand-red) !important;
         border-radius: 8px !important;
     }
+    
     button, div[data-testid="stFormSubmitButton"] button {
         font-size: 22px !important;
         font-weight: 800 !important;
@@ -50,6 +56,7 @@ st.html("""
         box-shadow: 0 0 15px rgba(197, 31, 42, 0.4) !important;
         width: 100% !important;
     }
+    
     .cyber-card {
         background-color: var(--card-bg);
         border-left: 6px solid var(--brand-red);
@@ -61,10 +68,12 @@ st.html("""
         margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
+    
     h1 { font-size: 42px !important; font-weight: 900 !important; color: var(--text-bright) !important; text-transform: uppercase; letter-spacing: 2px; }
     h2 { font-size: 32px !important; font-weight: 800 !important; color: var(--text-bright) !important; }
     h3 { font-size: 26px !important; font-weight: 700 !important; color: var(--neon-orange) !important; }
     h4 { font-size: 23px !important; font-weight: 700 !important; color: var(--text-bright) !important; margin: 0; }
+    
     .status-pill {
         display: inline-block;
         padding: 6px 16px;
@@ -77,6 +86,7 @@ st.html("""
     .st-expected { background-color: #2b2b1a; color: #ffcc00; border: 1px solid #ffcc00; }
     .st-incomplete { background-color: #3a1618; color: #ff4d4d; border: 1px solid #ff4d4d; }
     .st-complete { background-color: #122b18; color: #33cc66; border: 1px solid #33cc66; }
+    
     button[data-baseweb="tab"] {
         font-size: 20px !important;
         color: var(--text-mute) !important;
@@ -88,6 +98,7 @@ st.html("""
 </style>
 """)
 
+# 3. Secure Password Layer with Fixed Indentation & Spacing
 def check_password():
     if "authenticated" not in st.session_state: 
         st.session_state["authenticated"] = False
@@ -95,22 +106,7 @@ def check_password():
         return True
     
     st.title("🔒 SYSTEM LOCK")
-    st.subheader("RESTRICTED FABLINE INTERFACE")
-    password_input = st.text_input("ENTER ACCESS KEY PASSCODE:", type="password")
-    
-    if st.button("INITIALIZE INTERFACE"):
-        if password_input == "fabline2026":
-            st.session_state["authenticated"] = True
-            st.rerun()
-        else: 
-            st.error("ACCESS DENIED: INVALID DATA ENTRY TOKEN")
-    return False
-
-if not check_password(): 
-    st.stop()
-    
-    st.markdown("<h1>🔒 SYSTEM LOCK</h1>", unsafe_html=True)
-    st.markdown("<p style='color: #ff4d4d; font-weight: bold;'>RESTRICTED FABLINE INTERFACE</p>", unsafe_html=True)
+    st.caption("RESTRICTED FABLINE INTERFACE")
     password_input = st.text_input("ENTER ACCESS KEY PASSCODE:", type="password")
     
     if st.button("INITIALIZE INTERFACE"):
@@ -124,6 +120,7 @@ if not check_password():
 if not check_password(): 
     st.stop()
 
+# 4. Flat-File Data Storage Management
 DB_FILE = "jobs_data.json"
 def load_data():
     if os.path.exists(DB_FILE):
@@ -138,7 +135,8 @@ def save_data(data):
 if "jobs" not in st.session_state: 
     st.session_state.jobs = load_data()
 
-st.markdown("<h1>⚙️ FABLINE CORE</h1>", unsafe_html=True)
+# 5. Core Interface Heading & Statistics Panel
+st.title("⚙️ FABLINE CORE")
 st.markdown("<p style='color: #ff6a00; font-weight: bold; letter-spacing: 1.5px; margin-top:-15px;'>PROCUREMENT MONITOR & OPERATIONS TERMINAL</p>", unsafe_html=True)
 
 total_rec = len(st.session_state.jobs)
@@ -157,6 +155,7 @@ st.markdown("---")
 
 t1, t2, t3 = st.tabs(["📋 MANIFEST REGISTRY", "➕ INITIALIZE RECORD", "🤖 COGNITIVE AUDIT ASSISTANT"])
 
+# --- TAB 1: REGISTRY VIEW WITH DYNAMIC UPDATE PANEL ---
 with t1:
     search_q = st.text_input("🔍 SCAN REGISTRY KEYS (Job #, Location, Client Name, Components)...")
     filter_status = st.radio("SORT DATASET VIA OPERATIONS LAYER:", ["All Statuses", "Expected", "Incomplete", "Complete"], horizontal=True)
@@ -219,10 +218,12 @@ with t1:
                                     r_job['items_logged'] = r_job.get('items_logged', '') + f"\n[{datetime.now().strftime('%d-%b-%Y %H:%M')} by {up_op.strip()}]: " + new_txt.strip()
                                 break
                         save_data(st.session_state.jobs)
+                        save_data(st.session_state.jobs)
                         st.success("CORE MATRIX UPDATED: Refreshing display layers...")
                         st.rerun()
         st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_html=True)
 
+# --- TAB 2: LOG RECORD ENTRY PANEL ---
 with t2:
     st.markdown("<h2>➕ REGISTER INITIAL PROCURED RECORD</h2>", unsafe_html=True)
     st.markdown("Ensure warehouse cargo slips match tracking inputs exactly before committing entries.")
@@ -238,9 +239,13 @@ with t2:
         if st.form_submit_button("COMMIT ENTRY TO PERSISTENT DATABASE"):
             if j_no and clnt and op_name:
                 new_entry = {
-                    "job_no": j_no, "client": clnt, "site": stloc, "status": stch,
+                    "job_no": j_no, 
+                    "client": clnt, 
+                    "site": stloc, 
+                    "status": stch,
                     "items_logged": itm_log if itm_log.strip() else "No hardware documented at entry.",
-                    "operator": op_name.strip(), "updated": datetime.now().strftime("%d-%b-%Y %H:%M")
+                    "operator": op_name.strip(), 
+                    "updated": datetime.now().strftime("%d-%b-%Y %H:%M")
                 }
                 st.session_state.jobs.insert(0, new_entry)
                 save_data(st.session_state.jobs)
@@ -249,6 +254,7 @@ with t2:
             else: 
                 st.error("TRANSACTION HALTED: Job Ref, Client, and Authorizing Operator fields must contain text values.")
 
+# --- TAB 3: COGNITIVE SEARCH ENGINE ---
 with t3:
     st.markdown("<h2>🤖 COGNITIVE AUDIT INTERACTION CENTER</h2>", unsafe_html=True)
     st.markdown("Query the operational processor about historical cargo trends, materials history, or workforce sign-offs.")
@@ -262,7 +268,7 @@ with t3:
             st.markdown("### 📡 INTERFACE COGNITIVE READOUT RESPONSE")
             
             if not matches:
-                st.markdown(f"**Search Analysis Status:** Completed.\n\nNo records matching the term **'{query}'** exist in our database file. Please verify parameters or check alternative job references.")
+                st.markdown(f"Search Analysis Status: Completed.\n\nNo records matching the term '{query}' exist in our database file. Please verify parameters or check alternative job references.")
             else:
                 st.markdown(f"#### STATUS: {len(matches)} HISTORICAL ARCHIVES PARSED FOR '{query.upper()}'")
                 st.markdown("---")
@@ -272,9 +278,9 @@ with t3:
                 pending_matches = total_matches - completed_matches
                 
                 st.markdown(f"""
-                **Operational Intelligence Brief Summary:**
-                * **Discovered Records:** Found {total_matches} entries containing match patterns.
-                * **Status Split:** {completed_matches} are verified as fully **Complete**, while {pending_matches} are flagged as **Awaiting Action / Incomplete**.
+                Operational Intelligence Brief Summary:
+                * Discovered Records: Found {total_matches} entries containing match patterns.
+                * Status Split: {completed_matches} are verified as fully Complete, while {pending_matches} are flagged as Awaiting Action / Incomplete.
                 """)
                 
                 st.markdown("#### DETAILED TRANSACTION BREAKDOWNS:")
@@ -283,11 +289,11 @@ with t3:
                     st.markdown(f"""
                     ---
                     ### 📂 TRANSACTION {index + 1}: JOB RECORD #{item['job_no']}
-                    * **Log State Profile:** `{item['status']}`
-                    * **Account Client Profile:** **{item.get('client', 'N/A')}**
-                    * **Deployment Site:** *{item.get('site', 'N/A')}*
-                    * **Operational Log History Stamp:** Updated on **{item['updated']}** by Engineer **{item.get('operator', 'Unassigned')}**
+                    * Log State Profile: {item['status']}
+                    * Account Client Profile: {item.get('client', 'N/A')}
+                    * Deployment Site: {item.get('site', 'N/A')}
+                    * Operational Log History Stamp: Updated on {item['updated']} by Engineer {item.get('operator', 'Unassigned')}
                     
-                    **Hardware Line Manifest History:**
+                    Hardware Line Manifest History:
                     """)
                     st.code(item.get('items_logged', 'No log items saved.'))
