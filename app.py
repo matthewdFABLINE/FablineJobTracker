@@ -37,6 +37,10 @@ st.markdown(
         --badge-expected-txt: #fbbf24;
         --badge-expected-border: rgba(245, 158, 11, 0.3);
 
+        --badge-soon-bg: rgba(168, 85, 247, 0.15);
+        --badge-soon-txt: #c084fc;
+        --badge-soon-border: rgba(168, 85, 247, 0.3);
+
         --badge-incomplete-bg: rgba(239, 68, 68, 0.15);
         --badge-incomplete-txt: #f87171;
         --badge-incomplete-border: rgba(239, 68, 68, 0.3);
@@ -201,6 +205,7 @@ st.markdown(
     }
 
     .st-expected { background: var(--badge-expected-bg); color: var(--badge-expected-txt); border-color: var(--badge-expected-border); }
+    .st-soon-to-come { background: var(--badge-soon-bg); color: var(--badge-soon-txt); border-color: var(--badge-soon-border); }
     .st-incomplete { background: var(--badge-incomplete-bg); color: var(--badge-incomplete-txt); border-color: var(--badge-incomplete-border); }
     .st-complete { background: var(--badge-complete-bg); color: var(--badge-complete-txt); border-color: var(--badge-complete-border); }
 
@@ -342,6 +347,10 @@ def save_data(data):
 if "jobs" not in st.session_state:
     st.session_state.jobs = load_data()
 
+# Helper to normalize status strings to CSS slug class
+def get_status_slug(status_str):
+    return str(status_str).lower().replace(" ", "-")
+
 # 5. Header Section & Dashboard Metrics
 st.markdown(
     """
@@ -359,12 +368,14 @@ total_rec = len(st.session_state.jobs)
 comp_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") == "Complete")
 incomp_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") == "Incomplete")
 expected_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") == "Expected")
+soon_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") == "Soon to come")
 
-m1, m2, m3, m4 = st.columns(4)
+m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Total Records", total_rec)
 m2.metric("Complete & Verified", comp_cnt)
 m3.metric("Incomplete Orders", incomp_cnt)
 m4.metric("Expected Deliveries", expected_cnt)
+m5.metric("Soon to Come", soon_cnt)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -373,6 +384,8 @@ t1, t2, t3 = st.tabs([
     "➕ Archive New Record",
     "🔍 Historical Assistant",
 ])
+
+STATUS_OPTIONS = ["Expected", "Soon to come", "Incomplete", "Complete"]
 
 # --- TAB 1: MASTER REGISTRY VIEW ---
 with t1:
@@ -386,7 +399,7 @@ with t1:
     with col_filter:
         filter_status = st.selectbox(
             "Filter Status",
-            ["All Statuses", "Expected", "Incomplete", "Complete"],
+            ["All Statuses"] + STATUS_OPTIONS,
             label_visibility="collapsed",
         )
 
@@ -404,7 +417,7 @@ with t1:
     for job in filtered:
         job_no = job.get("job_no", "N/A")
         status = job.get("delivery_status", "Expected")
-        status_slug = str(status).lower()
+        status_slug = get_status_slug(status)
 
         st.markdown(
             f"""
@@ -438,13 +451,12 @@ with t1:
 
         with st.expander(f"Append Record Note or Update Status — #{job_no}"):
             with st.form(f"form_update_{job_no}"):
-                status_options = ["Expected", "Incomplete", "Complete"]
                 default_index = (
-                    status_options.index(status) if status in status_options else 0
+                    STATUS_OPTIONS.index(status) if status in STATUS_OPTIONS else 0
                 )
 
                 new_st = st.selectbox(
-                    "Update Delivery Status", status_options, index=default_index
+                    "Update Delivery Status", STATUS_OPTIONS, index=default_index
                 )
                 new_txt = st.text_area(
                     "Append Additional Notes",
@@ -500,7 +512,7 @@ with t2:
             )
             del_stat = st.selectbox(
                 "Delivery Status",
-                ["Expected", "Incomplete", "Complete"],
+                STATUS_OPTIONS,
             )
 
         itm_log = st.text_area(
@@ -576,12 +588,13 @@ with t3:
             )
 
             for item in matches:
+                status_slug = get_status_slug(item.get('delivery_status', 'Expected'))
                 st.markdown(
                     f"""
                 <div class="archive-card">
                     <div class="card-header">
                         <div class="card-title">Job No. #{item.get('job_no', 'N/A')}</div>
-                        <span class="status-badge st-{str(item.get('delivery_status', 'Expected')).lower()}">{item.get('delivery_status', 'N/A')}</span>
+                        <span class="status-badge st-{status_slug}">{item.get('delivery_status', 'N/A')}</span>
                     </div>
                     <div class="card-grid">
                         <div>
