@@ -20,7 +20,7 @@ except ImportError:
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Fabline Technical Registry & System Portal",
+    page_title="Fabline Internal Operations & Technical Registry",
     page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -93,7 +93,7 @@ st.markdown(
     .hero-banner {
         background-color: var(--navy-dark);
         border-radius: 12px;
-        padding: 2.5rem 3rem;
+        padding: 2.25rem 2.75rem;
         color: var(--pure-white);
         margin-bottom: 1.5rem;
         box-shadow: 0 10px 25px -5px rgba(15, 27, 45, 0.3);
@@ -102,21 +102,21 @@ st.markdown(
 
     .hero-title {
         font-family: 'Montserrat', sans-serif;
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: var(--pure-white);
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
         line-height: 1.2;
     }
 
     .hero-subtitle {
-        font-size: 1.05rem;
+        font-size: 1rem;
         color: #94A3B8;
-        max-width: 780px;
-        line-height: 1.6;
-        margin-bottom: 1.75rem;
+        max-width: 820px;
+        line-height: 1.5;
+        margin-bottom: 1.5rem;
     }
 
     .hero-cta-group {
@@ -133,8 +133,8 @@ st.markdown(
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.05em !important;
-        font-size: 0.875rem !important;
-        padding: 0.75rem 1.5rem !important;
+        font-size: 0.85rem !important;
+        padding: 0.7rem 1.4rem !important;
         border-radius: 6px !important;
         border: none !important;
         cursor: pointer;
@@ -156,8 +156,8 @@ st.markdown(
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.05em !important;
-        font-size: 0.875rem !important;
-        padding: 0.75rem 1.5rem !important;
+        font-size: 0.85rem !important;
+        padding: 0.7rem 1.4rem !important;
         border-radius: 6px !important;
         border: 2px solid var(--pure-white) !important;
         cursor: pointer;
@@ -497,19 +497,19 @@ def check_password():
         st.markdown(
             """
             <div style="background-color: #FFFFFF; border: 1px solid #CBD5E1; border-top: 5px solid #0F1B2D; border-radius: 8px; padding: 2.25rem; box-shadow: 0 10px 25px rgba(0,0,0,0.08);">
-                <div style="font-family: 'Montserrat', sans-serif; font-size: 1.35rem; font-weight: 800; text-transform: uppercase; color: #0F1B2D; margin-bottom: 0.25rem;">🔒 FABLINE SECURITY ACCESS</div>
-                <div style="font-size: 0.875rem; color: #64748B; margin-bottom: 1.5rem;">Enter authorized site key to access engineering registry and modular tracking.</div>
+                <div style="font-family: 'Montserrat', sans-serif; font-size: 1.35rem; font-weight: 800; text-transform: uppercase; color: #0F1B2D; margin-bottom: 0.25rem;">🔒 FABLINE INTERNAL SYSTEM ACCESS</div>
+                <div style="font-size: 0.875rem; color: #64748B; margin-bottom: 1.5rem;">Enter employee authorization key to access site registry and operational tools.</div>
             """,
             unsafe_allow_html=True,
         )
 
         password_input = st.text_input(
-            "Access Authorization Key", type="password", placeholder="Enter authorization key..."
+            "Employee Authorization Key", type="password", placeholder="Enter authorization key..."
         )
 
         expected_pass = st.secrets.get("ACCESS_KEY", "fabline2026")
 
-        if st.button("AUTHENTICATE TERMINAL"):
+        if st.button("AUTHENTICATE WORKSTATION"):
             if hmac.compare_digest(password_input, expected_pass):
                 st.session_state["authenticated"] = True
                 st.rerun()
@@ -642,7 +642,7 @@ def fabline_ai_response(user_query, jobs_data):
     if "pressure" in query_lower or "barlow" in query_lower or "mawp" in query_lower:
         response_text += "💡 **Technical Guidance:** Standard MAWP values are derived via Barlow's Formula ($P = \\frac{2St}{D}$). Refer to the **𝜟 Technical Calculator** tab to compute verified code pressures for high-purity assemblies.\n\n"
     elif "valve" in query_lower or "skid" in query_lower:
-        response_text += "🏷️ **Fire Safety & Modular Systems:** Fabline manufactures pre-commissioned skids for *Wet Pipe*, *Dry Pipe*, *Pre-Action*, and *Deluge* configurations compliant with NFPA standards.\n\n"
+        response_text += "🏷️ **Modular Systems Reference:** Fabline standard skids include *Wet Pipe*, *Dry Pipe*, *Pre-Action*, and *Deluge* configurations compliant with NFPA guidelines.\n\n"
 
     if matched_records:
         response_text += f"🔍 **Found {len(matched_records)} matching record(s) in the Fabline Registry:**\n\n"
@@ -671,7 +671,7 @@ if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [
         {
             "role": "agent",
-            "content": "👋 **Fabline Technical Support Agent Ready.** I can query material registries, verify NFPA valve configurations, or cross-reference job manifests. How can I assist your engineering workflow today?"
+            "content": "👋 **Fabline Internal Operations Assistant.** Ready to look up jobs, cross-reference material manifests, or check modular valve skid specs. How can I assist your shift today?"
         }
     ]
 
@@ -680,26 +680,22 @@ def get_status_slug(status_str):
     return str(status_str).lower().replace(" ", "-")
 
 
-# 5. HERO HEADER SECTION (Navy Blue + Red Accent + Modern Engineering Typography)
+# 5. HERO HEADER SECTION (Navy Blue + Modern Operational Focus)
 st.markdown(
     """
     <div class="hero-banner">
-        <div class="hero-title">ENGINEERING PRECISION. FIRE PROTECTION & FABRICATION REGISTRY.</div>
+        <div class="hero-title">FABLINE INTERNAL TECHNICAL REGISTRY & WORKFLOW PORTAL</div>
         <div class="hero-subtitle">
-            Welcome to Fabline's high-purity piping, modular skid fabrication, and site delivery archive. 
-            Track pre-commissioned assemblies, verify compliance standards, and maintain full custody logs.
+            Central operational hub for high-purity piping logs, modular skid fabrication tracking, and on-site material intake. 
+            Use this portal to register deliveries, verify pressure specs, and audit compliance logs.
         </div>
         <div class="hero-cta-group">
-            <a href="#master-registry" style="text-decoration: none;">
-                <button class="btn-cta-primary">
-                    🔥 REQUEST A QUOTE
-                </button>
-            </a>
-            <a href="#modular-systems" style="text-decoration: none;">
-                <button class="btn-cta-secondary">
-                    VIEW MODULAR SYSTEMS
-                </button>
-            </a>
+            <button class="btn-cta-primary" onclick="window.location.href='#new-shipment';">
+                ➕ LOG NEW SHIPMENT
+            </button>
+            <button class="btn-cta-secondary" onclick="window.location.href='#modular-systems';">
+                📋 MODULAR SYSTEM SPECS
+            </button>
         </div>
     </div>
 """,
@@ -713,10 +709,10 @@ incomp_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") ==
 expected_cnt = sum(1 for j in st.session_state.jobs if j.get("delivery_status") == "Expected")
 
 s1, s2, s3, s4 = st.columns(4)
-s1.metric("PRE-COMMISSIONED SKIDS", f"{comp_cnt} VERIFIED")
-s2.metric("GLOBAL REACH / SITES", "100% COMPLIANT")
-s3.metric("INCOMPLETE ORDERS", incomp_cnt)
-s4.metric("PENDING DELIVERIES", expected_cnt)
+s1.metric("VERIFIED SKIDS", f"{comp_cnt} COMPLETED")
+s2.metric("TOTAL REGISTRY JOBS", total_rec)
+s3.metric("INCOMPLETE / ISSUES", incomp_cnt)
+s4.metric("INBOUND DELIVERIES", expected_cnt)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -726,7 +722,7 @@ t1, t2, t3, t4, t5 = st.tabs([
     "➕ LOG NEW DELIVERY",
     "𝜟 TECHNICAL CALCULATOR",
     "🤖 FABLINE AI ASSISTANT",
-    "🏢 MODULAR SYSTEMS & VALVES",
+    "🏢 MODULAR SYSTEM SPECS",
 ])
 
 # --- TAB 1: MASTER REGISTRY VIEW ---
@@ -737,10 +733,10 @@ with t1:
             f"""
             <div class="alert-banner">
                 <div>
-                    <div class="alert-title">⚠️ SAFETY & LOGISTICS NOTICE: ACTIVE ACTION ITEMS</div>
+                    <div class="alert-title">⚠️ OPERATIONAL NOTICE: ACTION ITEMS PENDING</div>
                     <div class="alert-body">
-                        There are <strong>{incomp_cnt} incomplete material orders</strong> requiring verification and 
-                        <strong>{expected_cnt} inbound shipments</strong> scheduled for site arrival.
+                        There are <strong>{incomp_cnt} incomplete material orders</strong> requiring field inspection and 
+                        <strong>{expected_cnt} inbound shipments</strong> scheduled for site intake.
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
@@ -919,8 +915,8 @@ with t1:
 
 # --- TAB 2: ARCHIVE NEW RECORD ---
 with t2:
-    st.markdown("<h3 class='heading-industrial'>➕ REGISTER NEW SHIPMENT OR FABRICATION JOB</h3>", unsafe_allow_html=True)
-    st.write("Scan physical packing slips using AI OCR or manually enter material details.")
+    st.markdown("<h3 class='heading-industrial' id='new-shipment'>➕ REGISTER NEW SHIPMENT OR FABRICATION JOB</h3>", unsafe_allow_html=True)
+    st.write("Scan physical packing slips using AI OCR or manually enter material details into the database.")
 
     if HAS_OCR:
         st.markdown('<div style="background-color: #FFFFFF; border: 1px dashed #64748B; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">', unsafe_allow_html=True)
@@ -1003,7 +999,7 @@ with t3:
 # --- TAB 4: AI ASSISTANT ---
 with t4:
     st.markdown("<h3 class='heading-industrial'>🤖 FABLINE AI SITE ASSISTANT</h3>", unsafe_allow_html=True)
-    st.write("Query material records, code compliance specs, or fire system valve configurations.")
+    st.write("Query material records, code compliance specs, or internal modular valve skid references.")
 
     for msg in st.session_state.chat_messages:
         if msg["role"] == "user":
@@ -1021,10 +1017,10 @@ with t4:
         st.session_state.chat_messages.append({"role": "agent", "content": agent_reply})
         st.rerun()
 
-# --- TAB 5: MODULAR SYSTEMS & VALVES ---
+# --- TAB 5: MODULAR SYSTEM SPECS ---
 with t5:
-    st.markdown("<h3 class='heading-industrial' id='modular-systems'>🏢 PRE-FABRICATED MODULAR SKIDS & FIRE SAFETY SYSTEMS</h3>", unsafe_allow_html=True)
-    st.write("Fabline manufactures pre-commissioned skid packages designed for rapid site installation and NFPA compliance.")
+    st.markdown("<h3 class='heading-industrial' id='modular-systems'>🏢 PRE-FABRICATED MODULAR SKID SPECIFICATIONS</h3>", unsafe_allow_html=True)
+    st.write("Internal engineering reference guides for standard pre-commissioned skid packages and NFPA valve assemblies.")
 
     p1, p2 = st.columns(2)
     with p1:
@@ -1038,7 +1034,7 @@ with t5:
                 <p style="font-size: 0.9rem; color: #475569;">
                     Permanently pressurized water systems designed for immediate activation. Built with high-grade ductile iron body valves and pressure switches.
                 </p>
-                <div class="meta-label">KEY SPECIFICATIONS</div>
+                <div class="meta-label">KEY TECHNICAL SPECIFICATIONS</div>
                 <div class="meta-value" style="font-size: 0.85rem;">• Working Pressure: Up to 17.5 Bar (250 PSI)<br>• NFPA 13 Compliant<br>• Pre-wired alarm trim line</div>
             </div>
             """,
@@ -1055,7 +1051,7 @@ with t5:
                 <p style="font-size: 0.9rem; color: #475569;">
                     Pressurized with nitrogen/air for environments subject to freezing temperatures. Includes automatic air maintenance devices.
                 </p>
-                <div class="meta-label">KEY SPECIFICATIONS</div>
+                <div class="meta-label">KEY TECHNICAL SPECIFICATIONS</div>
                 <div class="meta-value" style="font-size: 0.85rem;">• Differential Latch Mechanism<br>• Integrated Air Compressor Port<br>• Temperature Rating: -10°C to +60°C</div>
             </div>
             """,
@@ -1073,7 +1069,7 @@ with t5:
                 <p style="font-size: 0.9rem; color: #475569;">
                     Dual-interlock system combining electric detection with sprinkler activation. Ideal for data centers, cleanrooms, and archives.
                 </p>
-                <div class="meta-label">KEY SPECIFICATIONS</div>
+                <div class="meta-label">KEY TECHNICAL SPECIFICATIONS</div>
                 <div class="meta-value" style="font-size: 0.85rem;">• Solenoid Actuated Deluge Valve<br>• Double-Interlock Safety Safeguard<br>• Pre-commissioned Control Panel</div>
             </div>
             """,
@@ -1090,7 +1086,7 @@ with t5:
                 <p style="font-size: 0.9rem; color: #475569;">
                     Unpressurized open-spray nozzle systems engineered for immediate, high-volume fire suppression in chemical processing plants.
                 </p>
-                <div class="meta-label">KEY SPECIFICATIONS</div>
+                <div class="meta-label">KEY TECHNICAL SPECIFICATIONS</div>
                 <div class="meta-value" style="font-size: 0.85rem;">• Fast-opening hydraulic diaphragm<br>• High-flow capacity (Cv rated)<br>• Seawater / Stainless Steel Options</div>
             </div>
             """,
