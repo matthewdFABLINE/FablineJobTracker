@@ -144,7 +144,7 @@ comp_cnt = sum(1 for j in st.session_state.jobs if j.get("status") == "Complete"
 incomp_cnt = sum(1 for j in st.session_state.jobs if j.get("status") == "Incomplete")
 expected_cnt = sum(1 for j in st.session_state.jobs if j.get("status") == "Expected")
 
-st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_html=True)
+st.html("<div style='margin-bottom: 20px;'></div>")
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("TOTAL REGISTRY", total_rec)
 m2.metric("READY / SECURED", comp_cnt)
