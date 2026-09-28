@@ -94,7 +94,6 @@ def check_password():
     if st.session_state["authenticated"]: 
         return True
     
-    # FIXED: Replaced crashing st.markdown with standard title layout to prevent TypeError
     st.title("🔒 SYSTEM LOCK")
     st.subheader("RESTRICTED FABLINE INTERFACE")
     password_input = st.text_input("ENTER ACCESS KEY PASSCODE:", type="password")
