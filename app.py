@@ -257,17 +257,36 @@ st.markdown(
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
     }
 
-    button[kind="primary"], div[data-testid="stFormSubmitButton"] button {
+    /* 🎯 UNIFIED BUTTON STYLING (MATCHES EXPORT CSV AND ALL BUTTONS) */
+    button, 
+    div[data-testid="stDownloadButton"] button, 
+    div[data-testid="stFormSubmitButton"] button {
+        background-color: var(--bg-surface) !important;
+        background-image: none !important;
+        color: var(--text-primary) !important;
+        font-weight: 500 !important;
+        font-size: 0.9rem !important;
+        border: 1px solid var(--border-subtle) !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        box-shadow: none !important;
+        transition: border-color 0.15s ease, background-color 0.15s ease !important;
+    }
+
+    button:hover, 
+    div[data-testid="stDownloadButton"] button:hover, 
+    div[data-testid="stFormSubmitButton"] button:hover {
+        border-color: var(--accent-blue) !important;
+        background-color: var(--bg-card) !important;
+        color: #ffffff !important;
+    }
+
+    /* Primary Accent Button for Form Submission */
+    button[kind="primary"] {
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
         color: #ffffff !important;
         font-weight: 600 !important;
-        font-size: 0.9rem !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        border-radius: 8px !important;
-        padding: 0.65rem 1.2rem !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
-        width: 100% !important;
-        transition: transform 0.1s ease, filter 0.15s ease !important;
     }
 
     .archive-card {
