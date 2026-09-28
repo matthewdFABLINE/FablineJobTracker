@@ -225,7 +225,7 @@ with t1:
 
 # --- TAB 2: LOG RECORD ENTRY PANEL ---
 with t2:
-    st.markdown("<h2>➕ REGISTER INITIAL PROCURED RECORD</h2>", unsafe_html=True)
+    st.html("<h2>➕ REGISTER INITIAL PROCURED RECORD</h2>")
     st.markdown("Ensure warehouse cargo slips match tracking inputs exactly before committing entries.")
     
     with st.form("new_form", clear_on_submit=True):
