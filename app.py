@@ -257,7 +257,7 @@ st.markdown(
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
     }
 
-    /* 🎯 UNIFIED BUTTON STYLING (MATCHES EXPORT CSV AND ALL BUTTONS) */
+    /* 🎯 UNIFIED BUTTON STYLING */
     button, 
     div[data-testid="stDownloadButton"] button, 
     div[data-testid="stFormSubmitButton"] button {
@@ -281,7 +281,6 @@ st.markdown(
         color: #ffffff !important;
     }
 
-    /* Primary Accent Button for Form Submission */
     button[kind="primary"] {
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
         color: #ffffff !important;
@@ -417,6 +416,40 @@ st.markdown(
         padding-top: 0.75rem;
         border-top: 1px solid var(--border-subtle);
         margin-top: 1rem;
+    }
+
+    /* 🤖 AI AGENT CHAT STYLES */
+    .chat-bubble-user {
+        background-color: #1e293b;
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 0.85rem 1.1rem;
+        margin-bottom: 0.75rem;
+        color: var(--text-primary);
+        max-width: 85%;
+        margin-left: auto;
+    }
+
+    .chat-bubble-agent {
+        background-color: var(--bg-surface);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.25rem;
+        color: var(--text-primary);
+        max-width: 90%;
+    }
+
+    .chat-agent-header {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #60a5fa;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.4rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
     }
 </style>
 """,
@@ -573,11 +606,57 @@ def generate_csv(records):
     return output.getvalue()
 
 
+# AI Agent Intelligence Logic
+def fabline_ai_response(user_query, jobs_data):
+    query_lower = user_query.lower()
+    
+    # 1. Search Database Matching
+    matched_records = [j for j in jobs_data if query_lower in str(j).lower()]
+    
+    response_text = ""
+    
+    # Keyword / Spec Answers
+    if "pressure" in query_lower or "barlow" in query_lower or "mawp" in query_lower:
+        response_text += "💡 **Technical Guidance:** For working pressure calculations, refer to our **𝜟 Technical Calculator** tab which uses Barlow's Formula ($P = \\frac{2St}{D}$). Standard 316L Schedule 40 piping typically yields 30,000 PSI allowable stress.\n\n"
+    elif "valve" in query_lower:
+        response_text += "🏷️ **Valve Specs:** Fabline tracks standard classifications: *Wet Pipe*, *Dry Pipe*, *Pre-Action*, and *Deluge* systems. Ensure all fire suppression assemblies carry verified pressure certifications.\n\n"
+    elif "orbital" in query_lower or "welding" in query_lower:
+        response_text += "⚙️ **High-Purity Standards:** Orbital welding on stainless steel piping requires argon purge gas verification and ASME B31.3 compliance logging.\n\n"
+
+    # Registry Search Results
+    if matched_records:
+        response_text += f"🔍 **Found {len(matched_records)} matching record(s) in the Fabline Registry:**\n\n"
+        for idx, rec in enumerate(matched_records[:5], 1):
+            response_text += (
+                f"**{idx}. Job No. #{rec.get('job_no')}** ({rec.get('category')})\n"
+                f"- **Status:** {rec.get('delivery_status')}\n"
+                f"- **Specs/Tag:** {rec.get('pipe_sizes')}\n"
+                f"- **Arrival:** {rec.get('arrival_datetime')}\n"
+                f"- **Inspector:** {rec.get('operator')}\n"
+                f"- **Manifest Snippet:** {rec.get('items_logged')[:120]}...\n\n"
+            )
+        if len(matched_records) > 5:
+            response_text += f"*...and {len(matched_records) - 5} additional record(s).* Try narrowing your query with a specific Job Number."
+    else:
+        if not response_text:
+            response_text = f"I searched the active database for **\"{user_query}\"** but couldn't find any direct record matches.\n\nYou can query me by **Job Number**, **Material Type** (e.g. *Stainless Steel*, *Flange*, *Beam*), **Inspector Name**, or **Status** (e.g. *Incomplete*)."
+
+    return response_text, matched_records
+
+
 if "jobs" not in st.session_state:
     st.session_state.jobs = load_data()
 
 if "item_count" not in st.session_state:
     st.session_state.item_count = 1
+
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = [
+        {
+            "role": "agent",
+            "content": "👋 Hello! I am the **Fabline AI Site Agent**. I can assist you with searching historical material dockets, technical piping specs, valve classifications, and quality logs. How can I help you today?"
+        }
+    ]
 
 
 def get_status_slug(status_str):
@@ -598,7 +677,7 @@ st.markdown(
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <span class="brand-chip">⚙️ High-Purity Piping</span>
                     <span class="brand-chip">🛠️ Precision Fabrication</span>
-                    <span class="brand-chip">📋 Quality Assured</span>
+                    <span class="brand-chip">🤖 AI On-Site Assistant</span>
                 </div>
             </div>
             <div style="display: flex; align-items: center; justify-content: center;">
@@ -635,7 +714,7 @@ t1, t2, t3, t4, t5 = st.tabs([
     "📋 Master Registry",
     "➕ Archive New Record",
     "𝜟 Technical Calculator",
-    "🔍 Historical Assistant",
+    "🤖 Fabline AI Assistant",
     "🏢 About Fabline & Valve Specs",
 ])
 
@@ -1075,86 +1154,63 @@ with t3:
             unsafe_allow_html=True,
         )
 
-# --- TAB 4: HISTORICAL ASSISTANT ---
+# --- TAB 4: FABLINE AI ASSISTANT ---
 with t4:
-    st.markdown("### Search Material Archives")
+    st.markdown("### 🤖 Fabline AI On-Site Assistant")
     st.markdown(
-        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;'>Lookup hardware items, movement logs, categories, and inspector tokens.</div>",
+        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.25rem;'>Ask questions regarding site materials, historical deliveries, valve specs, or technical piping standards.</div>",
         unsafe_allow_html=True,
     )
 
-    query = st.text_input(
-        "Search Keyword",
-        placeholder="Type a component (e.g. 'beam', 'butterfly valve') or inspector name...",
-    )
-
-    if query:
-        matches = [
-            j
-            for j in st.session_state.jobs
-            if query.lower() in str(j).lower()
-        ]
-
-        if not matches:
-            st.warning(f"No archive records found containing '{query}'.")
-        else:
-            total_matches = len(matches)
-            completed_matches = sum(
-                1 for m in matches if m.get("delivery_status") == "Complete"
-            )
-            pending_matches = total_matches - completed_matches
-
-            st.markdown(
-                f"""
-            <div style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem 1.25rem; margin-top: 1rem; margin-bottom: 1.5rem;">
-                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Archive Search Results</div>
-                <div style="font-size: 0.875rem; color: var(--text-secondary);">Found {total_matches} entries matching "<strong>{query}</strong>" ({completed_matches} Complete, {pending_matches} Pending).</div>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
-
-            for item in matches:
-                status_slug = get_status_slug(item.get('delivery_status', 'Expected'))
-                cat = item.get("category", "General Site Deliveries")
-                v_type = item.get("valve_type", "None / Standard Fitting")
-                
-                category_badge = f'<span class="category-tag">📦 {cat}</span>'
-                valve_badge = f'<span class="category-tag">🏷️ {v_type}</span>' if v_type and v_type != "None / Standard Fitting" else ""
-
+    # Render Active Chat Conversation
+    chat_container = st.container()
+    with chat_container:
+        for msg in st.session_state.chat_messages:
+            if msg["role"] == "user":
                 st.markdown(
                     f"""
-                <div class="archive-card">
-                    <div class="card-header">
-                        <div>
-                            <span class="card-title">Job No. #{item.get('job_no', 'N/A')}</span>
-                            {category_badge}
-                            {valve_badge}
-                        </div>
-                        <span class="status-badge st-{status_slug}">{item.get('delivery_status', 'N/A')}</span>
+                    <div class="chat-bubble-user">
+                        <strong>You:</strong><br>{msg["content"]}
                     </div>
-                    <div class="card-grid">
-                        <div>
-                            <div class="meta-label">Specification / Dimensions / Tag</div>
-                            <div class="meta-value">{item.get('pipe_sizes', 'N/A')}</div>
-                        </div>
-                        <div>
-                            <div class="meta-label">Date/Time Of Arrival</div>
-                            <div class="meta-value">{item.get('arrival_datetime', 'N/A')}</div>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="meta-label" style="margin-bottom: 0.35rem;">Inventory Manifest</div>
-                        <div class="inventory-block">{item.get('items_logged', 'No manifest data recorded.')}</div>
-                    </div>
-                    <div class="card-footer">
-                        <div>Authorized By: {item.get('operator', 'Unassigned')}</div>
-                        <div>Last Updated: {item.get('updated', 'N/A')}</div>
-                    </div>
-                </div>
-                """,
+                    """,
                     unsafe_allow_html=True,
                 )
+            else:
+                st.markdown(
+                    f"""
+                    <div class="chat-bubble-agent">
+                        <div class="chat-agent-header">🤖 Fabline AI Agent</div>
+                        {msg["content"]}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    # Prompt Input Box
+    with st.form("ai_chat_form", clear_on_submit=True):
+        c_in, c_btn = st.columns([5, 1])
+        with c_in:
+            user_prompt = st.text_input("Ask AI Assistant...", placeholder="e.g. Search for Job 84920 or ask 'What valve types do we track?'", label_visibility="collapsed")
+        with c_btn:
+            submit_prompt = st.form_submit_button("Send 🚀", use_container_width=True)
+
+        if submit_prompt and user_prompt.strip():
+            # Store user question
+            st.session_state.chat_messages.append({"role": "user", "content": user_prompt.strip()})
+            
+            # Generate AI Answer
+            bot_reply, _ = fabline_ai_response(user_prompt.strip(), st.session_state.jobs)
+            st.session_state.chat_messages.append({"role": "agent", "content": bot_reply})
+            st.rerun()
+
+    if st.button("🧹 Clear Chat History"):
+        st.session_state.chat_messages = [
+            {
+                "role": "agent",
+                "content": "👋 Hello! I am the **Fabline AI Site Agent**. I can assist you with searching historical material dockets, technical piping specs, valve classifications, and quality logs. How can I help you today?"
+            }
+        ]
+        st.rerun()
 
 # --- TAB 5: ABOUT FABLINE & VALVE SPECIFICATIONS ---
 with t5:
