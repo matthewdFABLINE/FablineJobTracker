@@ -1,7 +1,22 @@
+import csv
+import hmac
+import io
 import json
+import math
 import os
+import re
+import tempfile
 from datetime import datetime
 import streamlit as st
+
+# Optional OCR library import for image reading
+try:
+    import PIL.Image
+    import easyocr
+    import numpy as np
+    HAS_OCR = True
+except ImportError:
+    HAS_OCR = False
 
 # 1. Page Configuration
 st.set_page_config(
@@ -11,7 +26,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 2. Design System: Refined Modern Dark Theme (Warm Accents & Soft Contrast)
+# 2. Design System: Modern Dark Theme
 st.markdown(
     """
 <style>
@@ -50,9 +65,7 @@ st.markdown(
         --badge-complete-border: rgba(34, 197, 94, 0.3);
     }
 
-    * {
-        box-sizing: border-box !important;
-    }
+    * { box-sizing: border-box !important; }
 
     html, body, [data-testid="stAppViewContainer"] {
         background-color: var(--bg-main) !important;
@@ -69,15 +82,6 @@ st.markdown(
         padding-right: 1.5rem !important;
     }
 
-    h1 {
-        font-size: 1.85rem !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em !important;
-        color: var(--text-primary) !important;
-        margin-bottom: 0.2rem !important;
-    }
-
-    /* Welcome Hero Banner */
     .hero-banner {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         border: 1px solid var(--border-subtle);
@@ -120,7 +124,41 @@ st.markdown(
         margin-top: 0.75rem;
     }
 
-    /* Metric Cards */
+    .ocr-box {
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px dashed rgba(59, 130, 246, 0.4);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .alert-banner {
+        background-color: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .alert-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #f87171;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .alert-body {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
     [data-testid="stMetric"] {
         background-color: var(--bg-surface) !important;
         border: 1px solid var(--border-subtle) !important;
@@ -143,7 +181,6 @@ st.markdown(
         color: var(--text-primary) !important;
     }
 
-    /* Form Fields */
     input, textarea, select, div[data-baseweb="select"] {
         background-color: var(--bg-surface) !important;
         color: var(--text-primary) !important;
@@ -157,7 +194,6 @@ st.markdown(
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
     }
 
-    /* Tab Headers */
     div[data-baseweb="tab-list"] {
         background-color: var(--bg-surface) !important;
         padding: 5px !important;
@@ -185,7 +221,6 @@ st.markdown(
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
     }
 
-    /* Buttons */
     button[kind="primary"], div[data-testid="stFormSubmitButton"] button {
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
         color: #ffffff !important;
@@ -199,11 +234,6 @@ st.markdown(
         transition: transform 0.1s ease, filter 0.15s ease !important;
     }
 
-    button[kind="primary"]:hover, div[data-testid="stFormSubmitButton"] button:hover {
-        filter: brightness(1.1) !important;
-    }
-
-    /* Custom Record Display Cards */
     .archive-card {
         background-color: var(--bg-surface);
         border: 1px solid var(--border-subtle);
@@ -211,11 +241,6 @@ st.markdown(
         padding: 1.35rem 1.5rem;
         margin-bottom: 1.25rem;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-        transition: border-color 0.2s ease;
-    }
-
-    .archive-card:hover {
-        border-color: rgba(255, 255, 255, 0.2);
     }
 
     .card-header {
@@ -251,6 +276,19 @@ st.markdown(
     .st-soon-to-come { background: var(--badge-soon-bg); color: var(--badge-soon-txt); border-color: var(--badge-soon-border); }
     .st-incomplete { background: var(--badge-incomplete-bg); color: var(--badge-incomplete-txt); border-color: var(--badge-incomplete-border); }
     .st-complete { background: var(--badge-complete-bg); color: var(--badge-complete-txt); border-color: var(--badge-complete-border); }
+
+    .valve-tag {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 0.15rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+    }
 
     .card-grid {
         display: grid;
@@ -288,6 +326,31 @@ st.markdown(
         line-height: 1.5;
     }
 
+    .timeline-item {
+        border-left: 2px solid var(--accent-blue);
+        padding-left: 0.85rem;
+        margin-bottom: 0.75rem;
+        position: relative;
+    }
+
+    .timeline-date {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .timeline-actor {
+        font-size: 0.825rem;
+        color: #60a5fa;
+        font-weight: 600;
+    }
+
+    .timeline-note {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.2rem;
+    }
+
     .card-footer {
         display: flex;
         justify-content: space-between;
@@ -299,12 +362,6 @@ st.markdown(
         padding-top: 0.75rem;
         border-top: 1px solid var(--border-subtle);
         margin-top: 1rem;
-    }
-
-    div[data-testid="stExpander"] {
-        background-color: var(--bg-surface) !important;
-        border: 1px solid var(--border-subtle) !important;
-        border-radius: 8px !important;
     }
 </style>
 """,
@@ -337,7 +394,7 @@ def check_password():
         expected_pass = st.secrets.get("ACCESS_KEY", "fabline2026")
 
         if st.button("Unlock Terminal"):
-            if password_input == expected_pass:
+            if hmac.compare_digest(password_input, expected_pass):
                 st.session_state["authenticated"] = True
                 st.rerun()
             else:
@@ -351,20 +408,71 @@ def check_password():
 if not check_password():
     st.stop()
 
-# 4. Data Layer & Automatic Schema Migration
+# 4. Constants & Data Management
 DB_FILE = "jobs_data.json"
+STATUS_OPTIONS = ["Expected", "Soon to come", "Incomplete", "Complete"]
+VALVE_OPTIONS = ["None / Standard Fitting", "Wet Pipe", "Dry Pipe", "Pre-Action", "Deluge"]
+
+
+def parse_docket_image(image_bytes):
+    """
+    Parses a delivery docket image to extract Job Number and Item List.
+    Attempts OCR reading or structured text extraction.
+    """
+    extracted_text = ""
+    if HAS_OCR:
+        try:
+            image = PIL.Image.open(io.BytesIO(image_bytes))
+            reader = easyocr.Reader(['en'], gpu=False)
+            results = reader.readtext(np.array(image), detail=0)
+            extracted_text = "\n".join(results)
+        except Exception:
+            extracted_text = ""
+    
+    # Simple regex fallback parsing rule for Job Numbers and Line Items
+    job_no = ""
+    job_match = re.search(r'(?:Job|Order|Docket|PO)\s*#?\s*([A-Za-z0-9\-]+)', extracted_text, re.IGNORECASE)
+    if job_match:
+        job_no = job_match.group(1)
+
+    lines = [line.strip() for line in extracted_text.split("\n") if line.strip()]
+    formatted_items = []
+    
+    for line in lines:
+        # Check if line contains hardware-related keywords or quantities
+        if any(char.isdigit() for char in line) and len(line) > 3:
+            formatted_items.append(f"- {line}")
+            
+    manifest = "\n".join(formatted_items) if formatted_items else extracted_text
+
+    return job_no, manifest
 
 
 def migrate_record(job):
-    """Automatically maps legacy database keys to current standard keys."""
+    now_time = datetime.now().strftime("%d-%b-%Y %H:%M")
+    audit_trail = job.get("audit_trail", [])
+    if not audit_trail:
+        initial_op = job.get("operator", "System Operator")
+        audit_trail = [
+            {
+                "timestamp": job.get("updated", now_time),
+                "operator": initial_op,
+                "action": "Record Created / Migrated",
+                "status": job.get("delivery_status") or job.get("status", "Expected"),
+                "note": "Initial logging into Fabline database.",
+            }
+        ]
+
     return {
         "job_no": job.get("job_no", "N/A"),
         "pipe_sizes": job.get("pipe_sizes") or job.get("client", "N/A"),
         "arrival_datetime": job.get("arrival_datetime") or job.get("site", "N/A"),
         "delivery_status": job.get("delivery_status") or job.get("status", "Expected"),
+        "valve_type": job.get("valve_type", "None / Standard Fitting"),
         "items_logged": job.get("items_logged", "No hardware inventory recorded."),
         "operator": job.get("operator", "System Operator"),
-        "updated": job.get("updated", "N/A"),
+        "updated": job.get("updated", now_time),
+        "audit_trail": audit_trail,
     }
 
 
@@ -381,10 +489,27 @@ def load_data():
 
 def save_data(data):
     try:
-        with open(DB_FILE, "w") as f:
-            json.dump(data, f, indent=4)
+        dir_name = os.path.dirname(DB_FILE) or "."
+        with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False, encoding="utf-8") as tf:
+            json.dump(data, tf, indent=4)
+            temp_path = tf.name
+        os.replace(temp_path, DB_FILE)
     except Exception as e:
         st.error(f"Save failed: {e}")
+
+
+def generate_csv(records):
+    output = io.StringIO()
+    if not records:
+        return ""
+    
+    fieldnames = ["job_no", "pipe_sizes", "arrival_datetime", "delivery_status", "valve_type", "items_logged", "operator", "updated"]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in records:
+        writer.writerow({k: row.get(k, "") for k in fieldnames})
+    
+    return output.getvalue()
 
 
 if "jobs" not in st.session_state:
@@ -395,7 +520,7 @@ def get_status_slug(status_str):
     return str(status_str).lower().replace(" ", "-")
 
 
-# 5. Header Section & Formal Welcome Greeting
+# 5. Header Section
 st.markdown(
     """
     <div class="hero-banner">
@@ -411,11 +536,13 @@ st.markdown(
                 <span class="brand-chip">📋 Quality Assured</span>
             </div>
         </div>
-        <div>
-            <img src="https://fabline.ie/wp-content/uploads/2021/04/fabline-logo.png" 
-                 alt="Fabline Engineering Logo" 
-                 style="max-height: 55px; width: auto; opacity: 0.95; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));"
-                 onerror="this.style.display='none'">
+        <div style="display: flex; align-items: center; justify-content: center;">
+            <svg width="220" height="60" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="220" height="60" rx="8" fill="#1e293b"/>
+                <path d="M15 18H35V24H23V30H33V36H23V46H15V18Z" fill="#3b82f6"/>
+                <text x="45" y="38" font-family="'Inter', sans-serif" font-weight="800" font-size="24" fill="#ffffff" letter-spacing="1">FABLINE</text>
+                <text x="45" y="48" font-family="'Inter', sans-serif" font-weight="600" font-size="8" fill="#9ca3af" letter-spacing="2">ENGINEERING LTD</text>
+            </svg>
         </div>
     </div>
 """,
@@ -438,28 +565,54 @@ m5.metric("Soon to Come", soon_cnt)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-t1, t2, t3, t4 = st.tabs([
+t1, t2, t3, t4, t5 = st.tabs([
     "📋 Master Registry",
     "➕ Archive New Record",
+    "𝜟 Technical Calculator",
     "🔍 Historical Assistant",
-    "🏢 About Fabline",
+    "🏢 About Fabline & Valve Specs",
 ])
-
-STATUS_OPTIONS = ["Expected", "Soon to come", "Incomplete", "Complete"]
 
 # --- TAB 1: MASTER REGISTRY VIEW ---
 with t1:
-    col_search, col_filter = st.columns([3, 2])
+    pending_total = incomp_cnt + expected_cnt + soon_cnt
+    if pending_total > 0:
+        st.markdown(
+            f"""
+            <div class="alert-banner">
+                <div>
+                    <div class="alert-title">⚠️ Attention Required: Active Supply Chain Action Items</div>
+                    <div class="alert-body">
+                        There are currently <strong>{incomp_cnt} incomplete orders</strong> needing verification and 
+                        <strong>{expected_cnt + soon_cnt} pending shipments</strong> scheduled for arrival.
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <span class="status-badge st-incomplete">{incomp_cnt} Incomplete</span>
+                    <span class="status-badge st-expected">{expected_cnt} Expected</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    col_search, col_status, col_valve, col_export = st.columns([2.5, 1.5, 1.5, 1.2])
     with col_search:
         search_q = st.text_input(
             "Search Archive",
             placeholder="Search Job No., Sizes, Date, or Materials...",
             label_visibility="collapsed",
         )
-    with col_filter:
+    with col_status:
         filter_status = st.selectbox(
             "Filter Status",
             ["All Statuses"] + STATUS_OPTIONS,
+            label_visibility="collapsed",
+        )
+    with col_valve:
+        filter_valve = st.selectbox(
+            "Filter Valve Type",
+            ["All Valve Types"] + VALVE_OPTIONS,
             label_visibility="collapsed",
         )
 
@@ -468,6 +621,18 @@ with t1:
         filtered = [j for j in filtered if search_q.lower() in str(j).lower()]
     if filter_status != "All Statuses":
         filtered = [j for j in filtered if j.get("delivery_status") == filter_status]
+    if filter_valve != "All Valve Types":
+        filtered = [j for j in filtered if j.get("valve_type") == filter_valve]
+
+    with col_export:
+        csv_data = generate_csv(filtered)
+        st.download_button(
+            label="📥 Export CSV",
+            data=csv_data,
+            file_name=f"fabline_registry_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -477,13 +642,19 @@ with t1:
     for job in filtered:
         job_no = job.get("job_no", "N/A")
         status = job.get("delivery_status", "Expected")
+        v_type = job.get("valve_type", "None / Standard Fitting")
         status_slug = get_status_slug(status)
+
+        valve_badge = f'<span class="valve-tag">🏷️ {v_type}</span>' if v_type and v_type != "None / Standard Fitting" else ""
 
         st.markdown(
             f"""
         <div class="archive-card">
             <div class="card-header">
-                <div class="card-title">Job No. #{job_no}</div>
+                <div>
+                    <span class="card-title">Job No. #{job_no}</span>
+                    {valve_badge}
+                </div>
                 <span class="status-badge st-{status_slug}">{status}</span>
             </div>
             <div class="card-grid">
@@ -509,75 +680,152 @@ with t1:
             unsafe_allow_html=True,
         )
 
-        with st.expander(f"Append Record Note or Update Status — #{job_no}"):
-            with st.form(f"form_update_{job_no}"):
-                default_index = (
-                    STATUS_OPTIONS.index(status) if status in STATUS_OPTIONS else 0
-                )
+        with st.expander(f"Manage Record & View Full Audit Trail — #{job_no}"):
+            st.markdown("##### 📜 Audit Trail & Chain of Custody History")
+            trail = job.get("audit_trail", [])
+            if trail:
+                for event in reversed(trail):
+                    st.markdown(
+                        f"""
+                        <div class="timeline-item">
+                            <div class="timeline-date">🕒 {event.get('timestamp', 'N/A')}</div>
+                            <div class="timeline-actor">👤 {event.get('operator', 'System')} - <span style="color: var(--text-primary);">{event.get('action', 'Update')}</span> (Status: {event.get('status', 'N/A')})</div>
+                            <div class="timeline-note">{event.get('note', 'No details specified.')}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.caption("No historical audit steps recorded.")
 
-                new_st = st.selectbox(
-                    "Update Delivery Status", STATUS_OPTIONS, index=default_index
-                )
+            st.markdown("---")
+            st.markdown("##### ✏️ Update Record Details")
+
+            with st.form(f"form_update_{job_no}"):
+                default_st_idx = STATUS_OPTIONS.index(status) if status in STATUS_OPTIONS else 0
+                default_v_idx = VALVE_OPTIONS.index(v_type) if v_type in VALVE_OPTIONS else 0
+
+                c_u1, c_u2 = st.columns(2)
+                with c_u1:
+                    new_st = st.selectbox("Update Delivery Status", STATUS_OPTIONS, index=default_st_idx)
+                with c_u2:
+                    new_vt = st.selectbox("Update Valve Classification", VALVE_OPTIONS, index=default_v_idx)
+
                 new_txt = st.text_area(
                     "Append Additional Notes",
                     placeholder="e.g., Arrived with 2 missing 150mm gaskets.",
                 )
-                up_op = st.text_input("Your Name / Signature")
+                up_op = st.text_input("Your Name / Inspector Signature")
 
-                if st.form_submit_button("Save Changes"):
+                if st.form_submit_button("Save Changes & Log Audit Entry"):
                     if not up_op.strip():
                         st.error("Please enter your name or signature to verify this update.")
                     else:
+                        now_stamp = datetime.now().strftime("%d-%b-%Y %H:%M")
                         for r_job in st.session_state.jobs:
                             if r_job.get("job_no") == job_no:
+                                old_st = r_job.get("delivery_status")
                                 r_job["delivery_status"] = new_st
+                                r_job["valve_type"] = new_vt
                                 r_job["operator"] = up_op.strip()
-                                r_job["updated"] = datetime.now().strftime(
-                                    "%d-%b-%Y %H:%M"
-                                )
+                                r_job["updated"] = now_stamp
+                                
+                                note_entry = new_txt.strip() if new_txt.strip() else "Status / details updated."
                                 if new_txt.strip():
-                                    timestamp = datetime.now().strftime(
-                                        "%d-%b-%Y %H:%M"
-                                    )
                                     r_job["items_logged"] = (
                                         r_job.get("items_logged", "")
-                                        + f"\n[{timestamp} - {up_op.strip()}]: "
+                                        + f"\n[{now_stamp} - {up_op.strip()}]: "
                                         + new_txt.strip()
                                     )
+
+                                r_job.setdefault("audit_trail", []).append(
+                                    {
+                                        "timestamp": now_stamp,
+                                        "operator": up_op.strip(),
+                                        "action": f"Changed status from '{old_st}' to '{new_st}'" if old_st != new_st else "Updated details/notes",
+                                        "status": new_st,
+                                        "note": note_entry,
+                                    }
+                                )
                                 break
                         save_data(st.session_state.jobs)
-                        st.success("Record updated successfully.")
+                        st.success("Record updated and logged to audit trail.")
                         st.rerun()
 
-# --- TAB 2: ARCHIVE NEW RECORD ---
+# --- TAB 2: ARCHIVE NEW RECORD WITH CAMERA / DOCKET OCR SCANNING ---
 with t2:
     st.markdown("### Create New Requisition Record")
     st.markdown(
-        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;'>Enter arrival details and material manifests below.</div>",
+        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;'>Scan physical delivery paper or enter details manually below.</div>",
         unsafe_allow_html=True,
     )
+
+    # Smart Docket Scanner Box
+    st.markdown(
+        """
+        <div class="ocr-box">
+            <div style="font-size: 1rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.25rem;">📸 AI Delivery Docket Reader</div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                Take a photo of the paper delivery docket using your phone or laptop camera to instantly extract expected material line items and Job Numbers.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    scan_mode = st.radio(
+        "Capture Method",
+        ["📷 Use Camera", "📁 Upload Docket File/Photo"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    scanned_job_no = ""
+    scanned_manifest = ""
+
+    if scan_mode == "📷 Use Camera":
+        img_file = st.camera_input("Take picture of Delivery Docket")
+        if img_file:
+            with st.spinner("AI Reading Delivery Docket..."):
+                bytes_data = img_file.getvalue()
+                scanned_job_no, scanned_manifest = parse_docket_image(bytes_data)
+                st.success("Docket read successfully! Verify values in the form below.")
+    else:
+        uploaded_file = st.file_uploader("Upload Delivery Docket Image", type=["jpg", "jpeg", "png"])
+        if uploaded_file:
+            with st.spinner("AI Reading Delivery Docket..."):
+                bytes_data = uploaded_file.getvalue()
+                scanned_job_no, scanned_manifest = parse_docket_image(bytes_data)
+                st.success("Docket read successfully! Verify values in the form below.")
+
+    st.markdown("<hr style='border-color: var(--border-subtle); margin: 1.5rem 0;'>", unsafe_allow_html=True)
 
     now_str = datetime.now().strftime("%d-%b-%Y %H:%M")
 
     with st.form("new_form", clear_on_submit=True):
         c_a, c_b = st.columns(2)
         with c_a:
-            j_no = st.text_input("Job No.", placeholder="e.g. 84920")
+            j_no = st.text_input("Job No.", value=scanned_job_no, placeholder="e.g. 84920")
             pipe_sz = st.text_input(
                 "Pipe/Fitting/Valve Sizes", placeholder='e.g. 4" / 6" Grooved'
             )
         with c_b:
-            arr_dt = st.text_input(
-                "Date/Time Of Arrival", value=now_str
-            )
-            del_stat = st.selectbox(
-                "Delivery Status",
-                STATUS_OPTIONS,
-            )
+            arr_dt = st.text_input("Date/Time Of Arrival", value=now_str)
+            del_stat = st.selectbox("Delivery Status", STATUS_OPTIONS)
+
+        v_type_input = st.selectbox("Valve System Classification (Optional)", VALVE_OPTIONS)
+
+        default_manifest_val = (
+            f"--- EXPECTED FROM DOCKET SCAN ---\n{scanned_manifest}"
+            if scanned_manifest
+            else ""
+        )
 
         itm_log = st.text_area(
             "Hardware Inventory Manifest",
+            value=default_manifest_val,
             placeholder="e.g.,\n- 12x 100mm Grooved Elbows\n- 4x Butterfly Valves",
+            height=160,
         )
         op_name = st.text_input("Authorizing Officer / Inspector Signature")
 
@@ -586,18 +834,31 @@ with t2:
                 if any(j.get("job_no") == j_no.strip() for j in st.session_state.jobs):
                     st.error(f"Entry duplicate: Job No. '{j_no}' is already logged.")
                 else:
+                    creation_time = datetime.now().strftime("%d-%b-%Y %H:%M")
+                    initial_manifest = (
+                        itm_log.strip()
+                        if itm_log.strip()
+                        else "No hardware items listed upon entry."
+                    )
+                    
                     new_entry = {
                         "job_no": j_no.strip(),
                         "pipe_sizes": pipe_sz.strip(),
                         "arrival_datetime": arr_dt.strip(),
                         "delivery_status": del_stat,
-                        "items_logged": (
-                            itm_log.strip()
-                            if itm_log.strip()
-                            else "No hardware items listed upon entry."
-                        ),
+                        "valve_type": v_type_input,
+                        "items_logged": initial_manifest,
                         "operator": op_name.strip(),
-                        "updated": datetime.now().strftime("%d-%b-%Y %H:%M"),
+                        "updated": creation_time,
+                        "audit_trail": [
+                            {
+                                "timestamp": creation_time,
+                                "operator": op_name.strip(),
+                                "action": "Initial Creation (Docket Scanned)" if scanned_manifest else "Initial Creation",
+                                "status": del_stat,
+                                "note": f"Initial log created with manifest: {initial_manifest[:50]}...",
+                            }
+                        ],
                     }
                     st.session_state.jobs.insert(0, new_entry)
                     save_data(st.session_state.jobs)
@@ -608,8 +869,99 @@ with t2:
                     "Please fill out Job No., Pipe/Fitting/Valve Sizes, and Inspector Signature."
                 )
 
-# --- TAB 3: HISTORICAL ASSISTANT ---
+# --- TAB 3: TECHNICAL CALCULATOR ---
 with t3:
+    st.markdown("### On-Site Pipe Pressure & Volume Calculator")
+    st.markdown(
+        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;'>Rapid engineering estimation for internal pressure limits (Barlow's Formula) and hydrostatic water volumetric fill weights.</div>",
+        unsafe_allow_html=True,
+    )
+
+    col_calc1, col_calc2 = st.columns(2)
+
+    with col_calc1:
+        st.markdown("#### ⚡ Pressure Rating (Barlow's Formula)")
+        pipe_od_dict = {
+            '2" (60.3 mm OD)': 2.375,
+            '3" (88.9 mm OD)': 3.500,
+            '4" (114.3 mm OD)': 4.500,
+            '6" (168.3 mm OD)': 6.625,
+            '8" (219.1 mm OD)': 8.625,
+            '10" (273.1 mm OD)': 10.750,
+            '12" (323.8 mm OD)': 12.750,
+        }
+
+        sel_pipe = st.selectbox("Nominal Pipe Size", list(pipe_od_dict.keys()))
+        D = pipe_od_dict[sel_pipe]
+
+        sched = st.selectbox("Schedule / Wall Thickness", ["Schedule 10", "Schedule 40", "Schedule 80", "Schedule 160"])
+        wall_thickness_map = {
+            '2" (60.3 mm OD)': {"Schedule 10": 0.109, "Schedule 40": 0.154, "Schedule 80": 0.218, "Schedule 160": 0.343},
+            '3" (88.9 mm OD)': {"Schedule 10": 0.120, "Schedule 40": 0.216, "Schedule 80": 0.300, "Schedule 160": 0.438},
+            '4" (114.3 mm OD)': {"Schedule 10": 0.120, "Schedule 40": 0.237, "Schedule 80": 0.337, "Schedule 160": 0.531},
+            '6" (168.3 mm OD)': {"Schedule 10": 0.134, "Schedule 40": 0.280, "Schedule 80": 0.432, "Schedule 160": 0.718},
+            '8" (219.1 mm OD)': {"Schedule 10": 0.148, "Schedule 40": 0.322, "Schedule 80": 0.500, "Schedule 160": 0.906},
+            '10" (273.1 mm OD)': {"Schedule 10": 0.165, "Schedule 40": 0.365, "Schedule 80": 0.593, "Schedule 160": 1.125},
+            '12" (323.8 mm OD)': {"Schedule 10": 0.180, "Schedule 40": 0.375, "Schedule 80": 0.687, "Schedule 160": 1.312},
+        }
+
+        t_wall = wall_thickness_map[sel_pipe][sched]
+
+        mat_yield_dict = {
+            "316L Stainless Steel (30,000 PSI Yield)": 30000,
+            "304 Stainless Steel (30,000 PSI Yield)": 30000,
+            "Carbon Steel A106 Grade B (35,000 PSI Yield)": 35000,
+        }
+        sel_mat = st.selectbox("Material Grade", list(mat_yield_dict.keys()))
+        S = mat_yield_dict[sel_mat]
+
+        safety_factor = st.slider("Safety Factor (SF)", min_value=1.5, max_value=4.0, value=2.0, step=0.1)
+
+        burst_p = (2 * S * t_wall) / D
+        mawp = burst_p / safety_factor
+        mawp_bar = mawp * 0.0689476
+
+        st.markdown(
+            f"""
+            <div style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; margin-top: 1rem;">
+                <div class="meta-label">Calculated MAWP (Working Pressure)</div>
+                <div style="font-size: 1.6rem; font-weight: 700; color: #4ade80;">{mawp:,.0f} PSI <span style="font-size: 1rem; color: var(--text-secondary);">({mawp_bar:.1f} Bar)</span></div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
+                    Theoretical Burst Pressure: {burst_p:,.0f} PSI | Wall Thickness: {t_wall:.3f}"
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_calc2:
+        st.markdown("#### 💧 Internal Volume & Hydrostatic Fill Weight")
+
+        pipe_len = st.number_input("Total Pipe Run Length (Meters)", min_value=1.0, max_value=1000.0, value=10.0, step=1.0)
+
+        id_inches = D - (2 * t_wall)
+        id_meters = id_inches * 0.0254
+
+        volume_m3 = math.pi * ((id_meters / 2) ** 2) * pipe_len
+        volume_liters = volume_m3 * 1000.0
+        volume_gallons = volume_liters * 0.264172
+        water_weight_kg = volume_liters
+
+        st.markdown(
+            f"""
+            <div style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; margin-top: 1rem;">
+                <div class="meta-label">Internal Water Capacity</div>
+                <div style="font-size: 1.6rem; font-weight: 700; color: #60a5fa;">{volume_liters:.1f} Liters <span style="font-size: 1rem; color: var(--text-secondary);">({volume_gallons:.1f} US Gal)</span></div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
+                    Hydrotest Fluid Mass: ~{water_weight_kg:.1f} kg ({water_weight_kg * 2.20462:.1f} lbs) | Internal Dia: {id_inches:.3f}"
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+# --- TAB 4: HISTORICAL ASSISTANT ---
+with t4:
     st.markdown("### Search Material Archives")
     st.markdown(
         "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;'>Lookup hardware items, movement logs, and inspector tokens.</div>",
@@ -649,11 +1001,17 @@ with t3:
 
             for item in matches:
                 status_slug = get_status_slug(item.get('delivery_status', 'Expected'))
+                v_type = item.get("valve_type", "None / Standard Fitting")
+                valve_badge = f'<span class="valve-tag">🏷️ {v_type}</span>' if v_type and v_type != "None / Standard Fitting" else ""
+
                 st.markdown(
                     f"""
                 <div class="archive-card">
                     <div class="card-header">
-                        <div class="card-title">Job No. #{item.get('job_no', 'N/A')}</div>
+                        <div>
+                            <span class="card-title">Job No. #{item.get('job_no', 'N/A')}</span>
+                            {valve_badge}
+                        </div>
                         <span class="status-badge st-{status_slug}">{item.get('delivery_status', 'N/A')}</span>
                     </div>
                     <div class="card-grid">
@@ -679,17 +1037,17 @@ with t3:
                     unsafe_allow_html=True,
                 )
 
-# --- TAB 4: ABOUT FABLINE ---
-with t4:
+# --- TAB 5: ABOUT FABLINE & VALVE SPECIFICATIONS ---
+with t5:
     st.markdown("### About Fabline Engineering")
     st.markdown(
         """
-    Fabline Engineering specializes in high-purity mechanical piping, stainless steel fabrication, and modular skid manufacturing for pharmaceutical, microelectronics, and heavy industrial sectors.
+    Fabline Engineering specializes in high-purity mechanical piping, stainless steel fabrication, fire protection manifolds, and modular skid manufacturing for pharmaceutical, microelectronics, and heavy industrial sectors.
 
     #### Key Capabilities & Standards
     - **High-Purity Process Piping:** Orbital welding and certified cleanroom assembly.
+    - **Fire Protection Systems:** Custom manifold assemblies and specialized valve integration.
     - **Modular Skid Fabrication:** Off-site prefabrication reduces installation risk and downtime.
-    - **Quality Assurance & Traceability:** Material certifications, heat numbers, and inspection records logged to this registry.
     
     *For full corporate details or official project inquiries, visit [fabline.ie](https://fabline.ie).*
     """
