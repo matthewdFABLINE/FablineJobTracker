@@ -882,7 +882,9 @@ with t1:
                                 r_job["operator"] = up_op.strip()
                                 r_job["updated"] = now_stamp
                                 
+                                action_msg = f"Changed status from '{old_st}' to '{new_st}'" if old_st != new_st else "Updated record details"
                                 note_entry = new_txt.strip() if new_txt.strip() else "Status / details updated."
+                                
                                 if new_txt.strip():
                                     r_job["items_logged"] = (
                                         r_job.get("items_logged", "")
@@ -894,336 +896,134 @@ with t1:
                                     {
                                         "timestamp": now_stamp,
                                         "operator": up_op.strip(),
-                                        "action": f"Changed status from '{old_st}' to '{new_st}'" if old_st != new_st else "Updated details/notes",
+                                        "action": action_msg,
                                         "status": new_st,
                                         "note": note_entry,
                                     }
                                 )
                                 break
                         save_data(st.session_state.jobs)
-                        st.success("Record updated and logged to audit trail.")
+                        st.success("Record successfully updated and saved to audit log!")
                         st.rerun()
 
 # --- TAB 2: ARCHIVE NEW RECORD ---
 with t2:
-    st.markdown("### Create New Delivery Record")
-    st.markdown(
-        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;'>Scan physical delivery papers or enter custom multi-category line items below.</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("### ➕ Log & Register New Delivery")
+    st.write("Scan physical dockets using AI OCR or enter record details manually.")
 
-    st.markdown(
-        """
-        <div class="ocr-box">
-            <div style="font-size: 1rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.25rem;">📸 AI Delivery Docket Reader</div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                Take a photo of the paper delivery docket using your phone or laptop camera to instantly extract expected material line items and Job Numbers.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    scan_mode = st.radio(
-        "Capture Method",
-        ["📷 Use Camera", "📁 Upload Docket File/Photo"],
-        horizontal=True,
-        label_visibility="collapsed"
-    )
-
-    scanned_job_no = ""
-    scanned_manifest = ""
-
-    if scan_mode == "📷 Use Camera":
-        img_file = st.camera_input("Take picture of Delivery Docket")
-        if img_file:
-            with st.spinner("AI Reading Delivery Docket..."):
-                bytes_data = img_file.getvalue()
-                scanned_job_no, scanned_manifest = parse_docket_image(bytes_data)
-                st.success("Docket read successfully! Verify values in the form below.")
+    # OCR Section
+    if HAS_OCR:
+        with st.container():
+            st.markdown('<div class="ocr-box">', unsafe_allow_html=True)
+            st.markdown("##### 📷 Optional OCR Docket Scanner")
+            uploaded_img = st.file_uploader("Upload Delivery Docket / Packing Slip Photo", type=["png", "jpg", "jpeg"])
+            
+            ocr_job_no = ""
+            ocr_manifest = ""
+            if uploaded_img is not None:
+                with st.spinner("Extracting text from delivery docket..."):
+                    img_bytes = uploaded_img.read()
+                    ocr_job_no, ocr_manifest = parse_docket_image(img_bytes)
+                    st.success("OCR Processing Complete!")
+            st.markdown('</div>', unsafe_allow_html=True)
     else:
-        uploaded_file = st.file_uploader("Upload Delivery Docket Image", type=["jpg", "jpeg", "png"])
-        if uploaded_file:
-            with st.spinner("AI Reading Delivery Docket..."):
-                bytes_data = uploaded_file.getvalue()
-                scanned_job_no, scanned_manifest = parse_docket_image(bytes_data)
-                st.success("Docket read successfully! Verify values in the form below.")
+        ocr_job_no, ocr_manifest = "", ""
 
-    st.markdown("<hr style='border-color: var(--border-subtle); margin: 1.5rem 0;'>", unsafe_allow_html=True)
+    with st.form("new_record_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            in_job_no = st.text_input("Job / Order / Docket #", value=ocr_job_no, placeholder="e.g. JOB-8842")
+            in_category = st.selectbox("Delivery Category", CATEGORY_OPTIONS)
+            in_pipe_sizes = st.text_input("Specification / Size / Tag", placeholder="e.g. 2\" Schedule 40 316L SS Pipe")
+            in_arrival = st.text_input("Arrival Date / Time", value=datetime.now().strftime("%d-%b-%Y %H:%M"))
+        with c2:
+            in_status = st.selectbox("Delivery Status", STATUS_OPTIONS)
+            in_valve = st.selectbox("Valve Classification (If Applicable)", VALVE_OPTIONS)
+            in_operator = st.text_input("Inspector Name / Signature", placeholder="e.g. J. Doe")
 
-    now_str = datetime.now().strftime("%d-%b-%Y %H:%M")
+        st.markdown("##### 📦 Inventory Manifest / Log Items")
+        in_manifest = st.text_area("Detailed Item List & Quantities", value=ocr_manifest, height=120, placeholder="- 10x 2\" 90-degree Elbows\n- 5x Flanges")
 
-    st.markdown("#### 1. General Shipment Meta")
-    
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        j_no = st.text_input("Job / Order No. *", value=scanned_job_no, placeholder="e.g. 84920 or PO-10928")
-        shipment_cat = st.selectbox("Primary Category Classification", CATEGORY_OPTIONS)
-        pipe_sz = st.text_input(
-            "Overall Specs / Dimensions / Tag", placeholder='e.g. 4" Sch 40 / Stainless Steel / Beam IPE200'
-        )
-    with col_m2:
-        arr_dt = st.text_input("Date/Time Of Arrival", value=now_str)
-        del_stat = st.selectbox("Delivery Status", STATUS_OPTIONS)
-        v_type_input = st.selectbox("Valve System Classification (If Applicable)", VALVE_OPTIONS)
-
-    st.markdown("---")
-    st.markdown("#### 2. Detailed Itemized Manifest")
-    st.markdown(
-        "<div style='font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;'>Log diverse shipment records line-by-line or paste full raw manifest text below.</div>",
-        unsafe_allow_html=True,
-    )
-
-    entry_method = st.radio("Manifest Style", ["📝 Freeform Text / Docket Output", "➕ Structured Custom Line-Item Builder"], horizontal=True)
-
-    final_manifest_str = ""
-
-    if entry_method == "📝 Freeform Text / Docket Output":
-        default_manifest_val = (
-            f"--- SCANNED FROM DOCKET ---\n{scanned_manifest}"
-            if scanned_manifest
-            else ""
-        )
-        final_manifest_str = st.text_area(
-            "Inventory Items Log",
-            value=default_manifest_val,
-            placeholder="e.g.,\n- 5x IPE200 Beams 6m\n- 20x 1/2\" Stainless Steel Ball Valves\n- 2x Pallets 150mm Gaskets & Bolts",
-            height=180,
-        )
-    else:
-        st.caption("Add individual line items received on site:")
-        
-        c_add1, c_add2, _ = st.columns([1, 1, 3])
-        with c_add1:
-            if st.button("➕ Add Row"):
-                st.session_state.item_count += 1
-                st.rerun()
-        with c_add2:
-            if st.button("➖ Remove Row") and st.session_state.item_count > 1:
-                st.session_state.item_count -= 1
-                st.rerun()
-
-        item_rows = []
-        for i in range(st.session_state.item_count):
-            c_i1, c_i2, c_i3, c_i4 = st.columns([2, 1, 1, 2])
-            with c_i1:
-                item_desc = st.text_input(f"Item Description #{i+1}", key=f"desc_{i}", placeholder="e.g. M16 Stainless Steel Bolts")
-            with c_i2:
-                item_qty = st.text_input(f"Quantity #{i+1}", key=f"qty_{i}", placeholder="e.g. 50")
-            with c_i3:
-                item_unit = st.selectbox(f"Unit #{i+1}", ["Units", "Box/Pack", "Meters", "Lengths", "Pallets", "Kg"], key=f"unit_{i}")
-            with c_i4:
-                item_notes = st.text_input(f"Condition / Spec #{i+1}", key=f"notes_{i}", placeholder="e.g. Verified, Grade 316")
-
-            if item_desc.strip():
-                item_rows.append(f"- {item_qty} {item_unit} x {item_desc} ({item_notes})" if item_notes else f"- {item_qty} {item_unit} x {item_desc}")
-
-        final_manifest_str = "\n".join(item_rows) if item_rows else "No structured line items recorded."
-
-    st.markdown("---")
-    op_name = st.text_input("Authorizing Inspector / Site Signature *", placeholder="Enter your full name")
-
-    if st.button("Submit Record to Registry", type="primary"):
-        if j_no and pipe_sz and op_name:
-            if any(j.get("job_no") == j_no.strip() for j in st.session_state.jobs):
-                st.error(f"Entry duplicate: Job No. '{j_no}' is already logged in the database.")
+        if st.form_submit_button("Submit & Archive Record", use_container_width=True):
+            if not in_job_no.strip() or not in_operator.strip():
+                st.error("Job Number and Inspector Name are required fields.")
             else:
-                creation_time = datetime.now().strftime("%d-%b-%Y %H:%M")
-                initial_manifest = (
-                    final_manifest_str.strip()
-                    if final_manifest_str.strip()
-                    else "No material items listed upon entry."
-                )
-                
+                now_stamp = datetime.now().strftime("%d-%b-%Y %H:%M")
                 new_entry = {
-                    "job_no": j_no.strip(),
-                    "category": shipment_cat,
-                    "pipe_sizes": pipe_sz.strip(),
-                    "arrival_datetime": arr_dt.strip(),
-                    "delivery_status": del_stat,
-                    "valve_type": v_type_input,
-                    "items_logged": initial_manifest,
-                    "operator": op_name.strip(),
-                    "updated": creation_time,
+                    "job_no": in_job_no.strip(),
+                    "category": in_category,
+                    "pipe_sizes": in_pipe_sizes.strip() or "N/A",
+                    "arrival_datetime": in_arrival.strip(),
+                    "delivery_status": in_status,
+                    "valve_type": in_valve,
+                    "items_logged": in_manifest.strip() or "No details provided.",
+                    "operator": in_operator.strip(),
+                    "updated": now_stamp,
                     "audit_trail": [
                         {
-                            "timestamp": creation_time,
-                            "operator": op_name.strip(),
-                            "action": "Initial Creation (Docket Scanned)" if scanned_manifest else "Initial Creation",
-                            "status": del_stat,
-                            "note": f"Log created under '{shipment_cat}' category.",
+                            "timestamp": now_stamp,
+                            "operator": in_operator.strip(),
+                            "action": "Record Created",
+                            "status": in_status,
+                            "note": "Initial logging into Fabline database.",
                         }
                     ],
                 }
                 st.session_state.jobs.insert(0, new_entry)
                 save_data(st.session_state.jobs)
-                st.session_state.item_count = 1
-                st.success("Record successfully logged to registry!")
+                st.success(f"Job #{in_job_no} successfully logged!")
                 st.rerun()
-        else:
-            st.error("Please complete required fields: Job/Order No., Specs/Dimensions, and Inspector Signature.")
 
 # --- TAB 3: TECHNICAL CALCULATOR ---
 with t3:
-    st.markdown("### On-Site Pipe Pressure & Volume Calculator")
-    st.markdown(
-        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;'>Rapid engineering estimation for internal pressure limits (Barlow's Formula) and hydrostatic water volumetric fill weights.</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("### 𝜟 Piping & Pressure Technical Calculator")
+    st.write("Calculate Max Allowable Working Pressure (MAWP) using Barlow's Formula.")
 
-    col_calc1, col_calc2 = st.columns(2)
+    c_calc1, c_calc2 = st.columns(2)
+    with c_calc1:
+        outer_d = st.number_input("Outer Diameter ($D$) in inches", min_value=0.1, value=2.375, step=0.1)
+        wall_t = st.number_input("Wall Thickness ($t$) in inches", min_value=0.01, value=0.154, step=0.01)
+        stress_s = st.number_input("Allowable Stress ($S$) in PSI", min_value=1000, value=20000, step=1000)
 
-    with col_calc1:
-        st.markdown("#### ⚡ Pressure Rating (Barlow's Formula)")
-        pipe_od_dict = {
-            '2" (60.3 mm OD)': 2.375,
-            '3" (88.9 mm OD)': 3.500,
-            '4" (114.3 mm OD)': 4.500,
-            '6" (168.3 mm OD)': 6.625,
-            '8" (219.1 mm OD)': 8.625,
-            '10" (273.1 mm OD)': 10.750,
-            '12" (323.8 mm OD)': 12.750,
-        }
+    with c_calc2:
+        if outer_d > 0:
+            mawp = (2 * stress_s * wall_t) / outer_d
+            st.metric("Max Allowable Working Pressure (MAWP)", f"{mawp:.2f} PSI")
+            st.write(f"Equivalent Pressure: **{(mawp * 0.0689476):.2f} Bar**")
+            st.info("Formula applied: $P = \\frac{2St}{D}$ per ASME B31.3 Code Guidelines.")
 
-        sel_pipe = st.selectbox("Nominal Pipe Size", list(pipe_od_dict.keys()))
-        D = pipe_od_dict[sel_pipe]
-
-        sched = st.selectbox("Schedule / Wall Thickness", ["Schedule 10", "Schedule 40", "Schedule 80", "Schedule 160"])
-        wall_thickness_map = {
-            '2" (60.3 mm OD)': {"Schedule 10": 0.109, "Schedule 40": 0.154, "Schedule 80": 0.218, "Schedule 160": 0.343},
-            '3" (88.9 mm OD)': {"Schedule 10": 0.120, "Schedule 40": 0.216, "Schedule 80": 0.300, "Schedule 160": 0.438},
-            '4" (114.3 mm OD)': {"Schedule 10": 0.120, "Schedule 40": 0.237, "Schedule 80": 0.337, "Schedule 160": 0.531},
-            '6" (168.3 mm OD)': {"Schedule 10": 0.134, "Schedule 40": 0.280, "Schedule 80": 0.432, "Schedule 160": 0.718},
-            '8" (219.1 mm OD)': {"Schedule 10": 0.148, "Schedule 40": 0.322, "Schedule 80": 0.500, "Schedule 160": 0.906},
-            '10" (273.1 mm OD)': {"Schedule 10": 0.165, "Schedule 40": 0.365, "Schedule 80": 0.593, "Schedule 160": 1.125},
-            '12" (323.8 mm OD)': {"Schedule 10": 0.180, "Schedule 40": 0.375, "Schedule 80": 0.687, "Schedule 160": 1.312},
-        }
-
-        t_wall = wall_thickness_map[sel_pipe][sched]
-
-        mat_yield_dict = {
-            "316L Stainless Steel (30,000 PSI Yield)": 30000,
-            "304 Stainless Steel (30,000 PSI Yield)": 30000,
-            "Carbon Steel A106 Grade B (35,000 PSI Yield)": 35000,
-        }
-        sel_mat = st.selectbox("Material Grade", list(mat_yield_dict.keys()))
-        S = mat_yield_dict[sel_mat]
-
-        safety_factor = st.slider("Safety Factor (SF)", min_value=1.5, max_value=4.0, value=2.0, step=0.1)
-
-        burst_p = (2 * S * t_wall) / D
-        mawp = burst_p / safety_factor
-        mawp_bar = mawp * 0.0689476
-
-        st.markdown(
-            f"""
-            <div style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; margin-top: 1rem;">
-                <div class="meta-label">Calculated MAWP (Working Pressure)</div>
-                <div style="font-size: 1.6rem; font-weight: 700; color: #4ade80;">{mawp:,.0f} PSI <span style="font-size: 1rem; color: var(--text-secondary);">({mawp_bar:.1f} Bar)</span></div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
-                    Theoretical Burst Pressure: {burst_p:,.0f} PSI | Wall Thickness: {t_wall:.3f}"
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col_calc2:
-        st.markdown("#### 💧 Internal Volume & Hydrostatic Fill Weight")
-
-        pipe_len = st.number_input("Total Pipe Run Length (Meters)", min_value=1.0, max_value=1000.0, value=10.0, step=1.0)
-
-        id_inches = D - (2 * t_wall)
-        id_meters = id_inches * 0.0254
-
-        volume_m3 = math.pi * ((id_meters / 2) ** 2) * pipe_len
-        volume_liters = volume_m3 * 1000.0
-        volume_gallons = volume_liters * 0.264172
-        water_weight_kg = volume_liters
-
-        st.markdown(
-            f"""
-            <div style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; margin-top: 1rem;">
-                <div class="meta-label">Internal Water Capacity</div>
-                <div style="font-size: 1.6rem; font-weight: 700; color: #60a5fa;">{volume_liters:.1f} Liters <span style="font-size: 1rem; color: var(--text-secondary);">({volume_gallons:.1f} US Gal)</span></div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
-                    Hydrotest Fluid Mass: ~{water_weight_kg:.1f} kg ({water_weight_kg * 2.20462:.1f} lbs) | Internal Dia: {id_inches:.3f}"
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-# --- TAB 4: FABLINE AI ASSISTANT ---
+# --- TAB 4: AI ASSISTANT ---
 with t4:
     st.markdown("### 🤖 Fabline AI On-Site Assistant")
-    st.markdown(
-        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.25rem;'>Ask questions regarding site materials, historical deliveries, valve specs, or technical piping standards.</div>",
-        unsafe_allow_html=True,
-    )
+    st.write("Ask questions about material shipments, valve standards, or technical specifications.")
 
-    # Render Active Chat Conversation
-    chat_container = st.container()
-    with chat_container:
-        for msg in st.session_state.chat_messages:
-            if msg["role"] == "user":
-                st.markdown(
-                    f"""
-                    <div class="chat-bubble-user">
-                        <strong>You:</strong><br>{msg["content"]}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f"""
-                    <div class="chat-bubble-agent">
-                        <div class="chat-agent-header">🤖 Fabline AI Agent</div>
-                        {msg["content"]}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    for msg in st.session_state.chat_messages:
+        if msg["role"] == "user":
+            st.markdown(f'<div class="chat-bubble-user">{msg["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(
+                f'<div class="chat-bubble-agent"><div class="chat-agent-header">🤖 Fabline AI</div>{msg["content"]}</div>',
+                unsafe_allow_html=True,
+            )
 
-    # Prompt Input Box
-    with st.form("ai_chat_form", clear_on_submit=True):
-        c_in, c_btn = st.columns([5, 1])
-        with c_in:
-            user_prompt = st.text_input("Ask AI Assistant...", placeholder="e.g. Search for Job 84920 or ask 'What valve types do we track?'", label_visibility="collapsed")
-        with c_btn:
-            submit_prompt = st.form_submit_button("Send 🚀", use_container_width=True)
-
-        if submit_prompt and user_prompt.strip():
-            # Store user question
-            st.session_state.chat_messages.append({"role": "user", "content": user_prompt.strip()})
-            
-            # Generate AI Answer
-            bot_reply, _ = fabline_ai_response(user_prompt.strip(), st.session_state.jobs)
-            st.session_state.chat_messages.append({"role": "agent", "content": bot_reply})
-            st.rerun()
-
-    if st.button("🧹 Clear Chat History"):
-        st.session_state.chat_messages = [
-            {
-                "role": "agent",
-                "content": "👋 Hello! I am the **Fabline AI Site Agent**. I can assist you with searching historical material dockets, technical piping specs, valve classifications, and quality logs. How can I help you today?"
-            }
-        ]
+    user_input = st.chat_input("Ask about jobs, valves, piping specs, or status...")
+    if user_input:
+        st.session_state.chat_messages.append({"role": "user", "content": user_input})
+        agent_reply, _ = fabline_ai_response(user_input, st.session_state.jobs)
+        st.session_state.chat_messages.append({"role": "agent", "content": agent_reply})
         st.rerun()
 
-# --- TAB 5: ABOUT FABLINE & VALVE SPECIFICATIONS ---
+# --- TAB 5: ABOUT & SPECS ---
 with t5:
-    st.markdown("### About Fabline Engineering")
+    st.markdown("### 🏢 About Fabline Engineering & Technical Specs")
     st.markdown(
         """
-    Fabline Engineering specializes in high-purity mechanical piping, stainless steel fabrication, structural skids, and modular assembly for pharmaceutical, microelectronics, and heavy industrial sectors.
-
-    #### Key Capabilities & Standards
-    - **High-Purity Process Piping:** Orbital welding and certified cleanroom assembly.
-    - **Structural Steel & Skids:** Custom frame fabrication and off-site modular skids.
-    - **Fire Protection & Valve Assemblies:** Manifold integrations and certified pressure testing.
-    
-    *For full corporate details or official project inquiries, visit [fabline.ie](https://fabline.ie).*
-    """
+        **Fabline Engineering** specializes in high-purity piping, mechanical fabrication, and site installation.
+        
+        ##### 🏷️ Valve System Classifications:
+        - **Wet Pipe Systems:** Standard automatic sprinkler configuration charged with water under pressure.
+        - **Dry Pipe Systems:** Charged with nitrogen/air under pressure; ideal for freezing conditions.
+        - **Pre-Action Systems:** Interlocked control system requiring pre-activation detection prior to water release.
+        - **Deluge Systems:** Unpressurized open nozzle design for high-hazard deluge coverage.
+        """
     )
