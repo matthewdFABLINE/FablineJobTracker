@@ -256,7 +256,7 @@ with t2:
 
 # --- TAB 3: COGNITIVE SEARCH ENGINE ---
 with t3:
-    st.markdown("<h2>🤖 COGNITIVE AUDIT INTERACTION CENTER</h2>", unsafe_html=True)
+    st.html("<h2>🤖 COGNITIVE AUDIT INTERACTION CENTER</h2>")
     st.markdown("Query the operational processor about historical cargo trends, materials history, or workforce sign-offs.")
     
     query = st.text_input("💬 COMMAND INPUT (e.g., '100mm grooved elbows' or 'John'):")
