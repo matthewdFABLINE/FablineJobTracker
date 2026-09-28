@@ -26,27 +26,24 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 2. Design System: Modern Dark Theme
+# 2. Design System: Aesthetic Flowing Rainbow Neon Theme
 st.markdown(
     """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
     :root {
-        --bg-main: #0c1017;
-        --bg-surface: #161e2e;
-        --bg-card: #1f293d;
-        --bg-subtle: #2d3748;
+        --bg-main: #06080c;
+        --bg-surface: #0f141f;
+        --bg-card: #172030;
+        --bg-subtle: #232f45;
 
         --text-primary: #f3f4f6;
         --text-secondary: #9ca3af;
         --text-muted: #6b7280;
 
         --border-subtle: rgba(255, 255, 255, 0.1);
-        --border-focus: #3b82f6;
-
         --accent-blue: #3b82f6;
-        --accent-amber: #f59e0b;
 
         --badge-expected-bg: rgba(245, 158, 11, 0.15);
         --badge-expected-txt: #fbbf24;
@@ -82,13 +79,52 @@ st.markdown(
         padding-right: 1.5rem !important;
     }
 
-    .hero-banner {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 1px solid var(--border-subtle);
-        border-radius: 14px;
-        padding: 1.75rem 2rem;
+    /* 🌈 ANIMATED RAINBOW GLOW WRAPPER */
+    .rainbow-wrapper {
+        position: relative;
+        border-radius: 20px;
+        padding: 3px;
+        background: linear-gradient(
+            90deg,
+            #ff0055,
+            #ff5000,
+            #ffea00,
+            #00ff66,
+            #00e5ff,
+            #7a00ff,
+            #ff0055
+        );
+        background-size: 400% 400%;
+        animation: flowRainbow 8s linear infinite;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    /* Ambient Glow Behind Frame */
+    .rainbow-wrapper::before {
+        content: '';
+        position: absolute;
+        inset: -10px;
+        border-radius: 26px;
+        background: inherit;
+        background-size: inherit;
+        filter: blur(24px);
+        opacity: 0.6;
+        z-index: 0;
+        animation: flowRainbow 8s linear infinite;
+    }
+
+    @keyframes flowRainbow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    .hero-banner {
+        position: relative;
+        z-index: 1;
+        background: var(--bg-surface);
+        border-radius: 17px;
+        padding: 1.75rem 2rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -426,10 +462,6 @@ VALVE_OPTIONS = ["None / Standard Fitting", "Wet Pipe", "Dry Pipe", "Pre-Action"
 
 
 def parse_docket_image(image_bytes):
-    """
-    Parses a delivery docket image to extract Job Number and Item List.
-    Attempts OCR reading or structured text extraction.
-    """
     extracted_text = ""
     if HAS_OCR:
         try:
@@ -440,7 +472,6 @@ def parse_docket_image(image_bytes):
         except Exception:
             extracted_text = ""
     
-    # Simple regex fallback parsing rule for Job Numbers and Line Items
     job_no = ""
     job_match = re.search(r'(?:Job|Order|Docket|PO)\s*#?\s*([A-Za-z0-9\-]+)', extracted_text, re.IGNORECASE)
     if job_match:
@@ -534,29 +565,31 @@ def get_status_slug(status_str):
     return str(status_str).lower().replace(" ", "-")
 
 
-# 5. Header Section
+# 5. Animated Rainbow Header Section
 st.markdown(
     """
-    <div class="hero-banner">
-        <div>
-            <div class="hero-text-title">Hello & Welcome to Fabline</div>
-            <div class="hero-text-subtitle">
-                Welcome to Fabline’s primary online registry for material tracking and orders.
-                Log site deliveries, verify fittings, structural steel, and specialized equipment requisitions seamlessly across projects.
+    <div class="rainbow-wrapper">
+        <div class="hero-banner">
+            <div>
+                <div class="hero-text-title">Hello & Welcome to Fabline</div>
+                <div class="hero-text-subtitle">
+                    Welcome to Fabline’s primary online registry for material tracking and orders.
+                    Log site deliveries, verify fittings, structural steel, and specialized equipment requisitions seamlessly across projects.
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <span class="brand-chip">⚙️ High-Purity Piping</span>
+                    <span class="brand-chip">🛠️ Precision Fabrication</span>
+                    <span class="brand-chip">📋 Quality Assured</span>
+                </div>
             </div>
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <span class="brand-chip">⚙️ High-Purity Piping</span>
-                <span class="brand-chip">🛠️ Precision Fabrication</span>
-                <span class="brand-chip">📋 Quality Assured</span>
+            <div style="display: flex; align-items: center; justify-content: center;">
+                <svg width="220" height="60" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="220" height="60" rx="8" fill="#1e293b"/>
+                    <path d="M15 18H35V24H23V30H33V36H23V46H15V18Z" fill="#3b82f6"/>
+                    <text x="45" y="38" font-family="'Inter', sans-serif" font-weight="800" font-size="24" fill="#ffffff" letter-spacing="1">FABLINE</text>
+                    <text x="45" y="48" font-family="'Inter', sans-serif" font-weight="600" font-size="8" fill="#9ca3af" letter-spacing="2">ENGINEERING LTD</text>
+                </svg>
             </div>
-        </div>
-        <div style="display: flex; align-items: center; justify-content: center;">
-            <svg width="220" height="60" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="220" height="60" rx="8" fill="#1e293b"/>
-                <path d="M15 18H35V24H23V30H33V36H23V46H15V18Z" fill="#3b82f6"/>
-                <text x="45" y="38" font-family="'Inter', sans-serif" font-weight="800" font-size="24" fill="#ffffff" letter-spacing="1">FABLINE</text>
-                <text x="45" y="48" font-family="'Inter', sans-serif" font-weight="600" font-size="8" fill="#9ca3af" letter-spacing="2">ENGINEERING LTD</text>
-            </svg>
         </div>
     </div>
 """,
@@ -773,7 +806,7 @@ with t1:
                         st.success("Record updated and logged to audit trail.")
                         st.rerun()
 
-# --- TAB 2: ARCHIVE NEW RECORD (HANDLES DIVERSE SHIPMENT TYPES) ---
+# --- TAB 2: ARCHIVE NEW RECORD ---
 with t2:
     st.markdown("### Create New Delivery Record")
     st.markdown(
@@ -781,7 +814,6 @@ with t2:
         unsafe_allow_html=True,
     )
 
-    # Smart Docket Scanner Box
     st.markdown(
         """
         <div class="ocr-box">
@@ -823,7 +855,6 @@ with t2:
 
     now_str = datetime.now().strftime("%d-%b-%Y %H:%M")
 
-    # Header / Meta Information Form
     st.markdown("#### 1. General Shipment Meta")
     
     col_m1, col_m2 = st.columns(2)
@@ -864,7 +895,6 @@ with t2:
     else:
         st.caption("Add individual line items received on site:")
         
-        # Line Item Incrementor
         c_add1, c_add2, _ = st.columns([1, 1, 3])
         with c_add1:
             if st.button("➕ Add Row"):
