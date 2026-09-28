@@ -277,7 +277,7 @@ st.markdown(
     .st-incomplete { background: var(--badge-incomplete-bg); color: var(--badge-incomplete-txt); border-color: var(--badge-incomplete-border); }
     .st-complete { background: var(--badge-complete-bg); color: var(--badge-complete-txt); border-color: var(--badge-complete-border); }
 
-    .valve-tag {
+    .category-tag {
         display: inline-flex;
         align-items: center;
         background: rgba(59, 130, 246, 0.15);
@@ -411,6 +411,17 @@ if not check_password():
 # 4. Constants & Data Management
 DB_FILE = "jobs_data.json"
 STATUS_OPTIONS = ["Expected", "Soon to come", "Incomplete", "Complete"]
+CATEGORY_OPTIONS = [
+    "Piping & Tubing",
+    "Valves & Actuators",
+    "Fittings & Flanges",
+    "Structural & Support Steel",
+    "Fasteners, Gaskets & Seals",
+    "Consumables & Welding Supplies",
+    "Instruments & Electrical",
+    "Custom / Modular Skid / Equipment",
+    "General Site Deliveries"
+]
 VALVE_OPTIONS = ["None / Standard Fitting", "Wet Pipe", "Dry Pipe", "Pre-Action", "Deluge"]
 
 
@@ -439,7 +450,6 @@ def parse_docket_image(image_bytes):
     formatted_items = []
     
     for line in lines:
-        # Check if line contains hardware-related keywords or quantities
         if any(char.isdigit() for char in line) and len(line) > 3:
             formatted_items.append(f"- {line}")
             
@@ -465,11 +475,12 @@ def migrate_record(job):
 
     return {
         "job_no": job.get("job_no", "N/A"),
+        "category": job.get("category", "Piping & Tubing"),
         "pipe_sizes": job.get("pipe_sizes") or job.get("client", "N/A"),
         "arrival_datetime": job.get("arrival_datetime") or job.get("site", "N/A"),
         "delivery_status": job.get("delivery_status") or job.get("status", "Expected"),
         "valve_type": job.get("valve_type", "None / Standard Fitting"),
-        "items_logged": job.get("items_logged", "No hardware inventory recorded."),
+        "items_logged": job.get("items_logged", "No inventory recorded."),
         "operator": job.get("operator", "System Operator"),
         "updated": job.get("updated", now_time),
         "audit_trail": audit_trail,
@@ -503,7 +514,7 @@ def generate_csv(records):
     if not records:
         return ""
     
-    fieldnames = ["job_no", "pipe_sizes", "arrival_datetime", "delivery_status", "valve_type", "items_logged", "operator", "updated"]
+    fieldnames = ["job_no", "category", "pipe_sizes", "arrival_datetime", "delivery_status", "valve_type", "items_logged", "operator", "updated"]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
     for row in records:
@@ -514,6 +525,9 @@ def generate_csv(records):
 
 if "jobs" not in st.session_state:
     st.session_state.jobs = load_data()
+
+if "item_count" not in st.session_state:
+    st.session_state.item_count = 1
 
 
 def get_status_slug(status_str):
@@ -528,7 +542,7 @@ st.markdown(
             <div class="hero-text-title">Hello & Welcome to Fabline</div>
             <div class="hero-text-subtitle">
                 Welcome to Fabline’s primary online registry for material tracking and orders.
-                Log site deliveries, verify pipe fitting requisitions, and audit inventory movements seamlessly across projects.
+                Log site deliveries, verify fittings, structural steel, and specialized equipment requisitions seamlessly across projects.
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <span class="brand-chip">⚙️ High-Purity Piping</span>
@@ -596,11 +610,17 @@ with t1:
             unsafe_allow_html=True,
         )
 
-    col_search, col_status, col_valve, col_export = st.columns([2.5, 1.5, 1.5, 1.2])
+    col_search, col_cat, col_status, col_export = st.columns([2.5, 1.5, 1.5, 1.2])
     with col_search:
         search_q = st.text_input(
             "Search Archive",
-            placeholder="Search Job No., Sizes, Date, or Materials...",
+            placeholder="Search Job No., Category, Sizes, Date, or Materials...",
+            label_visibility="collapsed",
+        )
+    with col_cat:
+        filter_cat = st.selectbox(
+            "Filter Category",
+            ["All Categories"] + CATEGORY_OPTIONS,
             label_visibility="collapsed",
         )
     with col_status:
@@ -609,20 +629,14 @@ with t1:
             ["All Statuses"] + STATUS_OPTIONS,
             label_visibility="collapsed",
         )
-    with col_valve:
-        filter_valve = st.selectbox(
-            "Filter Valve Type",
-            ["All Valve Types"] + VALVE_OPTIONS,
-            label_visibility="collapsed",
-        )
 
     filtered = st.session_state.jobs
     if search_q:
         filtered = [j for j in filtered if search_q.lower() in str(j).lower()]
+    if filter_cat != "All Categories":
+        filtered = [j for j in filtered if j.get("category") == filter_cat]
     if filter_status != "All Statuses":
         filtered = [j for j in filtered if j.get("delivery_status") == filter_status]
-    if filter_valve != "All Valve Types":
-        filtered = [j for j in filtered if j.get("valve_type") == filter_valve]
 
     with col_export:
         csv_data = generate_csv(filtered)
@@ -641,11 +655,13 @@ with t1:
 
     for job in filtered:
         job_no = job.get("job_no", "N/A")
+        cat = job.get("category", "General Site Deliveries")
         status = job.get("delivery_status", "Expected")
         v_type = job.get("valve_type", "None / Standard Fitting")
         status_slug = get_status_slug(status)
 
-        valve_badge = f'<span class="valve-tag">🏷️ {v_type}</span>' if v_type and v_type != "None / Standard Fitting" else ""
+        category_badge = f'<span class="category-tag">📦 {cat}</span>'
+        valve_badge = f'<span class="category-tag">🏷️ {v_type}</span>' if v_type and v_type != "None / Standard Fitting" else ""
 
         st.markdown(
             f"""
@@ -653,13 +669,14 @@ with t1:
             <div class="card-header">
                 <div>
                     <span class="card-title">Job No. #{job_no}</span>
+                    {category_badge}
                     {valve_badge}
                 </div>
                 <span class="status-badge st-{status_slug}">{status}</span>
             </div>
             <div class="card-grid">
                 <div>
-                    <div class="meta-label">Pipe / Fitting / Valve Sizes</div>
+                    <div class="meta-label">Specification / Dimensions / Tag</div>
                     <div class="meta-value">{job.get('pipe_sizes', 'N/A')}</div>
                 </div>
                 <div>
@@ -704,11 +721,14 @@ with t1:
             with st.form(f"form_update_{job_no}"):
                 default_st_idx = STATUS_OPTIONS.index(status) if status in STATUS_OPTIONS else 0
                 default_v_idx = VALVE_OPTIONS.index(v_type) if v_type in VALVE_OPTIONS else 0
+                default_cat_idx = CATEGORY_OPTIONS.index(cat) if cat in CATEGORY_OPTIONS else 0
 
-                c_u1, c_u2 = st.columns(2)
+                c_u1, c_u2, c_u3 = st.columns(3)
                 with c_u1:
                     new_st = st.selectbox("Update Delivery Status", STATUS_OPTIONS, index=default_st_idx)
                 with c_u2:
+                    new_cat = st.selectbox("Update Delivery Category", CATEGORY_OPTIONS, index=default_cat_idx)
+                with c_u3:
                     new_vt = st.selectbox("Update Valve Classification", VALVE_OPTIONS, index=default_v_idx)
 
                 new_txt = st.text_area(
@@ -726,6 +746,7 @@ with t1:
                             if r_job.get("job_no") == job_no:
                                 old_st = r_job.get("delivery_status")
                                 r_job["delivery_status"] = new_st
+                                r_job["category"] = new_cat
                                 r_job["valve_type"] = new_vt
                                 r_job["operator"] = up_op.strip()
                                 r_job["updated"] = now_stamp
@@ -752,11 +773,11 @@ with t1:
                         st.success("Record updated and logged to audit trail.")
                         st.rerun()
 
-# --- TAB 2: ARCHIVE NEW RECORD WITH CAMERA / DOCKET OCR SCANNING ---
+# --- TAB 2: ARCHIVE NEW RECORD (HANDLES DIVERSE SHIPMENT TYPES) ---
 with t2:
-    st.markdown("### Create New Requisition Record")
+    st.markdown("### Create New Delivery Record")
     st.markdown(
-        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;'>Scan physical delivery paper or enter details manually below.</div>",
+        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;'>Scan physical delivery papers or enter custom multi-category line items below.</div>",
         unsafe_allow_html=True,
     )
 
@@ -802,72 +823,117 @@ with t2:
 
     now_str = datetime.now().strftime("%d-%b-%Y %H:%M")
 
-    with st.form("new_form", clear_on_submit=True):
-        c_a, c_b = st.columns(2)
-        with c_a:
-            j_no = st.text_input("Job No.", value=scanned_job_no, placeholder="e.g. 84920")
-            pipe_sz = st.text_input(
-                "Pipe/Fitting/Valve Sizes", placeholder='e.g. 4" / 6" Grooved'
-            )
-        with c_b:
-            arr_dt = st.text_input("Date/Time Of Arrival", value=now_str)
-            del_stat = st.selectbox("Delivery Status", STATUS_OPTIONS)
+    # Header / Meta Information Form
+    st.markdown("#### 1. General Shipment Meta")
+    
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        j_no = st.text_input("Job / Order No. *", value=scanned_job_no, placeholder="e.g. 84920 or PO-10928")
+        shipment_cat = st.selectbox("Primary Category Classification", CATEGORY_OPTIONS)
+        pipe_sz = st.text_input(
+            "Overall Specs / Dimensions / Tag", placeholder='e.g. 4" Sch 40 / Stainless Steel / Beam IPE200'
+        )
+    with col_m2:
+        arr_dt = st.text_input("Date/Time Of Arrival", value=now_str)
+        del_stat = st.selectbox("Delivery Status", STATUS_OPTIONS)
+        v_type_input = st.selectbox("Valve System Classification (If Applicable)", VALVE_OPTIONS)
 
-        v_type_input = st.selectbox("Valve System Classification (Optional)", VALVE_OPTIONS)
+    st.markdown("---")
+    st.markdown("#### 2. Detailed Itemized Manifest")
+    st.markdown(
+        "<div style='font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;'>Log diverse shipment records line-by-line or paste full raw manifest text below.</div>",
+        unsafe_allow_html=True,
+    )
 
+    entry_method = st.radio("Manifest Style", ["📝 Freeform Text / Docket Output", "➕ Structured Custom Line-Item Builder"], horizontal=True)
+
+    final_manifest_str = ""
+
+    if entry_method == "📝 Freeform Text / Docket Output":
         default_manifest_val = (
-            f"--- EXPECTED FROM DOCKET SCAN ---\n{scanned_manifest}"
+            f"--- SCANNED FROM DOCKET ---\n{scanned_manifest}"
             if scanned_manifest
             else ""
         )
-
-        itm_log = st.text_area(
-            "Hardware Inventory Manifest",
+        final_manifest_str = st.text_area(
+            "Inventory Items Log",
             value=default_manifest_val,
-            placeholder="e.g.,\n- 12x 100mm Grooved Elbows\n- 4x Butterfly Valves",
-            height=160,
+            placeholder="e.g.,\n- 5x IPE200 Beams 6m\n- 20x 1/2\" Stainless Steel Ball Valves\n- 2x Pallets 150mm Gaskets & Bolts",
+            height=180,
         )
-        op_name = st.text_input("Authorizing Officer / Inspector Signature")
+    else:
+        st.caption("Add individual line items received on site:")
+        
+        # Line Item Incrementor
+        c_add1, c_add2, _ = st.columns([1, 1, 3])
+        with c_add1:
+            if st.button("➕ Add Row"):
+                st.session_state.item_count += 1
+                st.rerun()
+        with c_add2:
+            if st.button("➖ Remove Row") and st.session_state.item_count > 1:
+                st.session_state.item_count -= 1
+                st.rerun()
 
-        if st.form_submit_button("Submit Record"):
-            if j_no and pipe_sz and op_name:
-                if any(j.get("job_no") == j_no.strip() for j in st.session_state.jobs):
-                    st.error(f"Entry duplicate: Job No. '{j_no}' is already logged.")
-                else:
-                    creation_time = datetime.now().strftime("%d-%b-%Y %H:%M")
-                    initial_manifest = (
-                        itm_log.strip()
-                        if itm_log.strip()
-                        else "No hardware items listed upon entry."
-                    )
-                    
-                    new_entry = {
-                        "job_no": j_no.strip(),
-                        "pipe_sizes": pipe_sz.strip(),
-                        "arrival_datetime": arr_dt.strip(),
-                        "delivery_status": del_stat,
-                        "valve_type": v_type_input,
-                        "items_logged": initial_manifest,
-                        "operator": op_name.strip(),
-                        "updated": creation_time,
-                        "audit_trail": [
-                            {
-                                "timestamp": creation_time,
-                                "operator": op_name.strip(),
-                                "action": "Initial Creation (Docket Scanned)" if scanned_manifest else "Initial Creation",
-                                "status": del_stat,
-                                "note": f"Initial log created with manifest: {initial_manifest[:50]}...",
-                            }
-                        ],
-                    }
-                    st.session_state.jobs.insert(0, new_entry)
-                    save_data(st.session_state.jobs)
-                    st.success("Record successfully logged to registry!")
-                    st.rerun()
+        item_rows = []
+        for i in range(st.session_state.item_count):
+            c_i1, c_i2, c_i3, c_i4 = st.columns([2, 1, 1, 2])
+            with c_i1:
+                item_desc = st.text_input(f"Item Description #{i+1}", key=f"desc_{i}", placeholder="e.g. M16 Stainless Steel Bolts")
+            with c_i2:
+                item_qty = st.text_input(f"Quantity #{i+1}", key=f"qty_{i}", placeholder="e.g. 50")
+            with c_i3:
+                item_unit = st.selectbox(f"Unit #{i+1}", ["Units", "Box/Pack", "Meters", "Lengths", "Pallets", "Kg"], key=f"unit_{i}")
+            with c_i4:
+                item_notes = st.text_input(f"Condition / Spec #{i+1}", key=f"notes_{i}", placeholder="e.g. Verified, Grade 316")
+
+            if item_desc.strip():
+                item_rows.append(f"- {item_qty} {item_unit} x {item_desc} ({item_notes})" if item_notes else f"- {item_qty} {item_unit} x {item_desc}")
+
+        final_manifest_str = "\n".join(item_rows) if item_rows else "No structured line items recorded."
+
+    st.markdown("---")
+    op_name = st.text_input("Authorizing Inspector / Site Signature *", placeholder="Enter your full name")
+
+    if st.button("Submit Record to Registry", type="primary"):
+        if j_no and pipe_sz and op_name:
+            if any(j.get("job_no") == j_no.strip() for j in st.session_state.jobs):
+                st.error(f"Entry duplicate: Job No. '{j_no}' is already logged in the database.")
             else:
-                st.error(
-                    "Please fill out Job No., Pipe/Fitting/Valve Sizes, and Inspector Signature."
+                creation_time = datetime.now().strftime("%d-%b-%Y %H:%M")
+                initial_manifest = (
+                    final_manifest_str.strip()
+                    if final_manifest_str.strip()
+                    else "No material items listed upon entry."
                 )
+                
+                new_entry = {
+                    "job_no": j_no.strip(),
+                    "category": shipment_cat,
+                    "pipe_sizes": pipe_sz.strip(),
+                    "arrival_datetime": arr_dt.strip(),
+                    "delivery_status": del_stat,
+                    "valve_type": v_type_input,
+                    "items_logged": initial_manifest,
+                    "operator": op_name.strip(),
+                    "updated": creation_time,
+                    "audit_trail": [
+                        {
+                            "timestamp": creation_time,
+                            "operator": op_name.strip(),
+                            "action": "Initial Creation (Docket Scanned)" if scanned_manifest else "Initial Creation",
+                            "status": del_stat,
+                            "note": f"Log created under '{shipment_cat}' category.",
+                        }
+                    ],
+                }
+                st.session_state.jobs.insert(0, new_entry)
+                save_data(st.session_state.jobs)
+                st.session_state.item_count = 1
+                st.success("Record successfully logged to registry!")
+                st.rerun()
+        else:
+            st.error("Please complete required fields: Job/Order No., Specs/Dimensions, and Inspector Signature.")
 
 # --- TAB 3: TECHNICAL CALCULATOR ---
 with t3:
@@ -964,13 +1030,13 @@ with t3:
 with t4:
     st.markdown("### Search Material Archives")
     st.markdown(
-        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;'>Lookup hardware items, movement logs, and inspector tokens.</div>",
+        "<div style='font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;'>Lookup hardware items, movement logs, categories, and inspector tokens.</div>",
         unsafe_allow_html=True,
     )
 
     query = st.text_input(
         "Search Keyword",
-        placeholder="Type a component (e.g. 'butterfly valve') or inspector name...",
+        placeholder="Type a component (e.g. 'beam', 'butterfly valve') or inspector name...",
     )
 
     if query:
@@ -1001,8 +1067,11 @@ with t4:
 
             for item in matches:
                 status_slug = get_status_slug(item.get('delivery_status', 'Expected'))
+                cat = item.get("category", "General Site Deliveries")
                 v_type = item.get("valve_type", "None / Standard Fitting")
-                valve_badge = f'<span class="valve-tag">🏷️ {v_type}</span>' if v_type and v_type != "None / Standard Fitting" else ""
+                
+                category_badge = f'<span class="category-tag">📦 {cat}</span>'
+                valve_badge = f'<span class="category-tag">🏷️ {v_type}</span>' if v_type and v_type != "None / Standard Fitting" else ""
 
                 st.markdown(
                     f"""
@@ -1010,13 +1079,14 @@ with t4:
                     <div class="card-header">
                         <div>
                             <span class="card-title">Job No. #{item.get('job_no', 'N/A')}</span>
+                            {category_badge}
                             {valve_badge}
                         </div>
                         <span class="status-badge st-{status_slug}">{item.get('delivery_status', 'N/A')}</span>
                     </div>
                     <div class="card-grid">
                         <div>
-                            <div class="meta-label">Pipe/Fitting/Valve Sizes</div>
+                            <div class="meta-label">Specification / Dimensions / Tag</div>
                             <div class="meta-value">{item.get('pipe_sizes', 'N/A')}</div>
                         </div>
                         <div>
@@ -1042,12 +1112,12 @@ with t5:
     st.markdown("### About Fabline Engineering")
     st.markdown(
         """
-    Fabline Engineering specializes in high-purity mechanical piping, stainless steel fabrication, fire protection manifolds, and modular skid manufacturing for pharmaceutical, microelectronics, and heavy industrial sectors.
+    Fabline Engineering specializes in high-purity mechanical piping, stainless steel fabrication, structural skids, and modular assembly for pharmaceutical, microelectronics, and heavy industrial sectors.
 
     #### Key Capabilities & Standards
     - **High-Purity Process Piping:** Orbital welding and certified cleanroom assembly.
-    - **Fire Protection Systems:** Custom manifold assemblies and specialized valve integration.
-    - **Modular Skid Fabrication:** Off-site prefabrication reduces installation risk and downtime.
+    - **Structural Steel & Skids:** Custom frame fabrication and off-site modular skids.
+    - **Fire Protection & Valve Assemblies:** Manifold integrations and certified pressure testing.
     
     *For full corporate details or official project inquiries, visit [fabline.ie](https://fabline.ie).*
     """
