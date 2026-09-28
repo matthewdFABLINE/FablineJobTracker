@@ -94,6 +94,22 @@ def check_password():
     if st.session_state["authenticated"]: 
         return True
     
+    # FIXED: Replaced crashing st.markdown with standard title layout to prevent TypeError
+    st.title("🔒 SYSTEM LOCK")
+    st.subheader("RESTRICTED FABLINE INTERFACE")
+    password_input = st.text_input("ENTER ACCESS KEY PASSCODE:", type="password")
+    
+    if st.button("INITIALIZE INTERFACE"):
+        if password_input == "fabline2026":
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else: 
+            st.error("ACCESS DENIED: INVALID DATA ENTRY TOKEN")
+    return False
+
+if not check_password(): 
+    st.stop()
+    
     st.markdown("<h1>🔒 SYSTEM LOCK</h1>", unsafe_html=True)
     st.markdown("<p style='color: #ff4d4d; font-weight: bold;'>RESTRICTED FABLINE INTERFACE</p>", unsafe_html=True)
     password_input = st.text_input("ENTER ACCESS KEY PASSCODE:", type="password")
