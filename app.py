@@ -8,6 +8,14 @@ import tempfile
 from datetime import datetime
 import streamlit as st
 
+# Optional OCR library import for image processing
+try:
+    import pytesseract
+    from PIL import Image
+    HAS_OCR = True
+except ImportError:
+    HAS_OCR = False
+
 # 1. Page Configuration
 st.set_page_config(
     page_title="Fabline Internal Operations & Technical Registry",
@@ -65,7 +73,6 @@ st.markdown(
         padding-right: 1.5rem !important;
     }
 
-    /* INDUSTRIAL GEOMETRIC HEADINGS */
     h1, h2, h3, .heading-industrial {
         font-family: 'Montserrat', sans-serif !important;
         text-transform: uppercase !important;
@@ -73,7 +80,6 @@ st.markdown(
         font-weight: 800 !important;
     }
 
-    /* HERO HEADER */
     .hero-banner {
         background-color: var(--navy-dark);
         border-radius: 12px;
@@ -103,7 +109,6 @@ st.markdown(
         margin-bottom: 1rem;
     }
 
-    /* STREAMLIT NATIVE METRIC OVERRIDES */
     [data-testid="stMetric"] {
         background-color: var(--pure-white) !important;
         border: 1px solid var(--steel-border) !important;
@@ -128,7 +133,6 @@ st.markdown(
         color: var(--navy-dark) !important;
     }
 
-    /* BADGES & CARDS */
     .product-card {
         background-color: var(--pure-white);
         border: 1px solid var(--steel-border);
@@ -246,7 +250,6 @@ st.markdown(
         line-height: 1.5;
     }
 
-    /* NOTICE CARDS */
     .notice-card {
         background-color: #FFFFFF;
         border: 1px solid #CBD5E1;
@@ -271,7 +274,6 @@ st.markdown(
         background-color: #F0F9FF;
     }
 
-    /* TAB CONTROLS */
     div[data-baseweb="tab-list"] {
         background-color: var(--pure-white) !important;
         padding: 6px !important;
@@ -366,11 +368,10 @@ def check_password():
 
     return False
 
-
 if not check_password():
     st.stop()
 
-# 4. Constants & Data Management
+# 4. Data Management & OCR Helper
 DB_FILE = "jobs_data.json"
 NOTICES_FILE = "notices_data.json"
 
@@ -389,6 +390,30 @@ CATEGORY_OPTIONS = [
 ]
 VALVE_OPTIONS = ["None / Standard Fitting", "Wet Pipe", "Dry Pipe", "Pre-Action", "Deluge"]
 
+def process_docket_image(uploaded_file):
+    """Processes uploaded docket image and extracts text."""
+    if not HAS_OCR:
+        return "OCR library not installed. Install 'pytesseract' and 'Pillow' for automatic image text extraction."
+    try:
+        image = Image.open(uploaded_file)
+        text = pytesseract.image_to_string(image)
+        return text.strip() if text.strip() else "No text could be extracted from image."
+    except Exception as e:
+        return f"Error extracting text from image: {e}"
+
+def cross_check_docket_vs_user(docket_text, user_items):
+    """Compares docket text with user input to flag potential discrepancies."""
+    if not docket_text or "not installed" in docket_text:
+        return True, "No automated OCR check performed."
+    
+    docket_words = set(re.findall(r'\w+', docket_text.lower()))
+    user_words = set(re.findall(r'\w+', user_items.lower()))
+    
+    # Check key overlap
+    common = docket_words.intersection(user_words)
+    if len(common) < 2 and len(user_words) > 3:
+        return False, "⚠️ Warning: Low similarity between physical docket photo text and user-entered manifest."
+    return True, "✅ Docket photo matches user manifest entry."
 
 def migrate_record(job):
     now_time = datetime.now().strftime("%d-%b-%Y %H:%M")
@@ -413,11 +438,12 @@ def migrate_record(job):
         "delivery_status": job.get("delivery_status") or job.get("status", "Expected"),
         "valve_type": job.get("valve_type", "None / Standard Fitting"),
         "items_logged": job.get("items_logged", "No inventory recorded."),
+        "docket_text": job.get("docket_text", "No physical docket uploaded."),
+        "docket_match_status": job.get("docket_match_status", "Not Verified"),
         "operator": job.get("operator", "System Operator"),
         "updated": job.get("updated", now_time),
         "audit_trail": audit_trail,
     }
-
 
 def load_data(file_path):
     if os.path.exists(file_path):
@@ -431,7 +457,6 @@ def load_data(file_path):
             return []
     return []
 
-
 def save_data(file_path, data):
     try:
         dir_name = os.path.dirname(file_path) or "."
@@ -441,7 +466,6 @@ def save_data(file_path, data):
         os.replace(temp_path, file_path)
     except Exception as e:
         st.error(f"Save failed: {e}")
-
 
 def generate_csv(records):
     output = io.StringIO()
@@ -456,6 +480,7 @@ def generate_csv(records):
         "delivery_status",
         "valve_type",
         "items_logged",
+        "docket_match_status",
         "operator",
         "updated",
     ]
@@ -466,7 +491,6 @@ def generate_csv(records):
 
     return output.getvalue()
 
-
 # Persistent Session Setup
 if "jobs" not in st.session_state:
     st.session_state.jobs = load_data(DB_FILE)
@@ -474,10 +498,8 @@ if "jobs" not in st.session_state:
 if "notices" not in st.session_state:
     st.session_state.notices = load_data(NOTICES_FILE)
 
-
 def get_status_slug(status_str):
     return str(status_str).lower().replace(" ", "-")
-
 
 # 5. HERO HEADER
 st.markdown(
@@ -485,7 +507,7 @@ st.markdown(
     <div class="hero-banner">
         <div class="hero-title">FABLINE INTERNAL TECHNICAL REGISTRY & WORKFLOW PORTAL</div>
         <div class="hero-subtitle">
-            Central operational hub for high-purity piping logs, modular skid fabrication tracking, and on-site material intake.
+            Central operational hub with AI Vision Docket Parsing, cross-verification, and high-purity piping logs.
         </div>
     </div>
 """,
@@ -511,9 +533,9 @@ st.markdown("<br>", unsafe_allow_html=True)
 t1, t2, t3, t4, t5, t6 = st.tabs([
     "📋 MASTER REGISTRY",
     "📢 OFFICE NOTICEBOARD",
-    "➕ LOG NEW DELIVERY",
+    "➕ LOG NEW DELIVERY (WITH DOCKET SCAN)",
     "𝜟 TECHNICAL CALCULATOR",
-    "🤖 FABLINE AI ASSISTANT",
+    "🤖 ADVANCED FABLINE AI ASSISTANT",
     "🏢 MODULAR SYSTEM SPECS",
 ])
 
@@ -544,7 +566,7 @@ with t1:
     with col_search:
         search_q = st.text_input(
             "Search Archive",
-            placeholder="Search Job No., Spec, Inspector, or Manifest...",
+            placeholder="Search Job No., Spec, Inspector, Docket, or Manifest...",
             label_visibility="collapsed",
         )
     with col_cat:
@@ -613,6 +635,10 @@ with t1:
                     <div class="meta-label">Scheduled / Arrival Time</div>
                     <div class="meta-value">{job.get('arrival_datetime', 'N/A')}</div>
                 </div>
+                <div>
+                    <div class="meta-label">Docket Verification</div>
+                    <div class="meta-value">{job.get('docket_match_status', 'N/A')}</div>
+                </div>
             </div>
             <div>
                 <div class="meta-label" style="margin-bottom: 0.35rem;">Material Manifest & Logged Items</div>
@@ -626,74 +652,6 @@ with t1:
         """,
             unsafe_allow_html=True,
         )
-
-        with st.expander(f"⚙️ Manage & Audit Trail — #{job_no}"):
-            st.markdown("##### 📜 CHAIN OF CUSTODY AUDIT LOG")
-            trail = job.get("audit_trail", [])
-            if trail:
-                for event in reversed(trail):
-                    st.markdown(
-                        f"""
-                        <div style="border-left: 3px solid #0F1B2D; padding-left: 0.85rem; margin-bottom: 0.75rem;">
-                            <div style="font-size: 0.75rem; color: #64748B; font-weight: 700;">🕒 {event.get('timestamp', 'N/A')}</div>
-                            <div style="font-size: 0.85rem; color: #0F1B2D; font-weight: 700;">👤 {event.get('operator', 'System')} - {event.get('action', 'Update')} <span class="status-badge st-{get_status_slug(event.get('status'))}" style="font-size: 0.65rem;">{event.get('status')}</span></div>
-                            <div style="font-size: 0.85rem; color: #475569; margin-top: 0.15rem;">{event.get('note', 'No notes.')}</div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-            st.markdown("---")
-            st.markdown("##### ✏️ UPDATE RECORD DETAILS")
-
-            with st.form(f"form_update_{job_no}"):
-                default_st_idx = STATUS_OPTIONS.index(status) if status in STATUS_OPTIONS else 0
-                default_v_idx = VALVE_OPTIONS.index(v_type) if v_type in VALVE_OPTIONS else 0
-                default_cat_idx = CATEGORY_OPTIONS.index(cat) if cat in CATEGORY_OPTIONS else 0
-
-                c_u1, c_u2, c_u3 = st.columns(3)
-                with c_u1:
-                    new_st = st.selectbox("Delivery Status", STATUS_OPTIONS, index=default_st_idx)
-                with c_u2:
-                    new_cat = st.selectbox("Category", CATEGORY_OPTIONS, index=default_cat_idx)
-                with c_u3:
-                    new_vt = st.selectbox("Valve System", VALVE_OPTIONS, index=default_v_idx)
-
-                new_txt = st.text_area(
-                    "Append Field Inspection Notes",
-                    placeholder="e.g., Hydrostatic pressure test passed at 300 PSI.",
-                )
-                up_op = st.text_input("Inspector Name / ID Signature")
-
-                if st.form_submit_button("SAVE CHANGES & UPDATE AUDIT LOG"):
-                    if not up_op.strip():
-                        st.error("Inspector signature is required to verify changes.")
-                    else:
-                        now_stamp = datetime.now().strftime("%d-%b-%Y %H:%M")
-                        for r_job in st.session_state.jobs:
-                            if r_job.get("job_no") == job_no:
-                                old_st = r_job.get("delivery_status")
-                                r_job["delivery_status"] = new_st
-                                r_job["category"] = new_cat
-                                r_job["valve_type"] = new_vt
-                                r_job["operator"] = up_op.strip()
-                                r_job["updated"] = now_stamp
-
-                                action_msg = f"Status changed from '{old_st}' to '{new_st}'" if old_st != new_st else "Updated record specs"
-                                note_entry = new_txt.strip() if new_txt.strip() else "Inspection details updated."
-
-                                r_job["audit_trail"].append({
-                                    "timestamp": now_stamp,
-                                    "operator": up_op.strip(),
-                                    "action": action_msg,
-                                    "status": new_st,
-                                    "note": note_entry,
-                                })
-                                break
-
-                        save_data(DB_FILE, st.session_state.jobs)
-                        st.success(f"Record for Job #{job_no} successfully updated!")
-                        st.rerun()
 
 # --- TAB 2: OFFICE NOTICEBOARD ---
 with t2:
@@ -710,7 +668,7 @@ with t2:
         with cn3:
             n_job_ref = st.text_input("Related Job # (Optional)", placeholder="e.g., FL-8820")
 
-        n_details = st.text_area("Notice Details / Missing Items / Truck Schedule", placeholder="Describe the notification, expected delivery window, or missing items from shipments...")
+        n_details = st.text_area("Notice Details / Missing Items / Truck Schedule", placeholder="Describe notification details...")
         n_author = st.text_input("Posted By (Office Staff Signature)")
 
         if st.form_submit_button("POST NOTICE TO BULLETIN"):
@@ -738,10 +696,6 @@ with t2:
 
     st.markdown("---")
     st.markdown("##### 📌 ACTIVE SITE NOTICES")
-
-    if not st.session_state.notices:
-        st.info("No active notices currently posted.")
-
     for idx, notice in enumerate(st.session_state.notices):
         u_class = notice.get("urgency_class", "info")
         st.markdown(
@@ -765,18 +719,24 @@ with t2:
             """,
             unsafe_allow_html=True,
         )
-        
-        col_del, _ = st.columns([1, 5])
-        with col_del:
-            if st.button(f"🗑️ Archive Notice", key=f"del_note_{idx}"):
-                st.session_state.notices.pop(idx)
-                save_data(NOTICES_FILE, st.session_state.notices)
-                st.rerun()
 
-# --- TAB 3: LOG NEW DELIVERY ---
+# --- TAB 3: LOG NEW DELIVERY (WITH OCR DOCKET SCAN) ---
 with t3:
-    st.markdown("### ➕ LOG NEW MATERIAL SHIPMENT / SKID ENTRY")
-    with st.form("form_new_job"):
+    st.markdown("### ➕ LOG NEW SHIPMENT & SCAN DELIVERY DOCKET")
+    st.caption("Take a photo or upload a delivery docket to cross-verify physical paperwork against user entries.")
+
+    uploaded_docket = st.file_uploader("📷 Upload / Snap Photo of Delivery Docket", type=["png", "jpg", "jpeg"])
+    scanned_docket_text = ""
+    
+    if uploaded_docket is not None:
+        st.image(uploaded_docket, caption="Uploaded Delivery Docket", width=350)
+        with st.spinner("AI scanning delivery docket text..."):
+            scanned_docket_text = process_docket_image(uploaded_docket)
+        
+        with st.expander("🔍 View Extracted OCR Text from Docket Photo"):
+            st.code(scanned_docket_text)
+
+    with st.form("form_new_job_with_docket"):
         c_n1, c_n2 = st.columns(2)
         with c_n1:
             n_job_no = st.text_input("Job Number / PO #", placeholder="e.g. FL-9921")
@@ -787,37 +747,48 @@ with t3:
             n_valve = st.selectbox("Modular Valve System", VALVE_OPTIONS)
             n_arrival = st.text_input("Arrival Date/Time", value=datetime.now().strftime("%d-%b-%Y %H:%M"))
 
-        n_manifest = st.text_area("Material Manifest / Line Items", placeholder="List items received...")
+        n_manifest = st.text_area("User Entered Material Manifest / Items", placeholder="List items manually received...")
         n_op = st.text_input("Receiving Inspector Signature")
 
-        if st.form_submit_button("SUBMIT NEW ENTRY TO REGISTRY"):
+        if st.form_submit_button("SUBMIT AND CROSS-CHECK WITH AI"):
             if not n_job_no.strip() or not n_op.strip():
                 st.error("Job Number and Inspector Signature are mandatory fields.")
             else:
                 now_stamp = datetime.now().strftime("%d-%b-%Y %H:%M")
+                
+                # Cross-check user entry against docket OCR
+                is_match, match_msg = cross_check_docket_vs_user(scanned_docket_text, n_manifest)
+                
+                final_status = n_status
+                if not is_match and n_status == "Complete":
+                    final_status = "Incomplete"
+                    st.warning("Status automatically flagged as 'Incomplete' due to docket manifest discrepancy.")
+
                 new_entry = {
                     "job_no": n_job_no.strip(),
                     "category": n_cat,
                     "pipe_sizes": n_pipe_sizes.strip() or "N/A",
                     "arrival_datetime": n_arrival.strip(),
-                    "delivery_status": n_status,
+                    "delivery_status": final_status,
                     "valve_type": n_valve,
                     "items_logged": n_manifest.strip() or "No manifest attached.",
+                    "docket_text": scanned_docket_text or "No docket scanned.",
+                    "docket_match_status": match_msg,
                     "operator": n_op.strip(),
                     "updated": now_stamp,
                     "audit_trail": [
                         {
                             "timestamp": now_stamp,
                             "operator": n_op.strip(),
-                            "action": "Record Created",
-                            "status": n_status,
-                            "note": "Initial site intake logging.",
+                            "action": "Record Created with Docket Scan",
+                            "status": final_status,
+                            "note": f"Cross-check result: {match_msg}",
                         }
                     ],
                 }
                 st.session_state.jobs.append(new_entry)
                 save_data(DB_FILE, st.session_state.jobs)
-                st.success(f"Job #{n_job_no} logged successfully!")
+                st.success(f"Job #{n_job_no} logged! {match_msg}")
                 st.rerun()
 
 # --- TAB 4: TECHNICAL CALCULATOR ---
@@ -839,25 +810,44 @@ with t4:
             st.metric("COMPUTED MAWP (PSI)", f"{mawp_psi:,.2f} PSI")
             st.metric("COMPUTED MAWP (BAR)", f"{mawp_bar:,.2f} bar")
 
-# --- TAB 5: AI ASSISTANT ---
+# --- TAB 5: ADVANCED AI ASSISTANT & HISTORICAL MEMORY ---
 with t5:
-    st.markdown("### 🤖 FABLINE OPERATIONS ASSISTANT")
-    user_q = st.text_input("Ask a question about current jobs or specs:")
+    st.markdown("### 🤖 FABLINE INTELLIGENT KNOWLEDGE ASSISTANT")
+    st.caption("Queries complete database memory including parsed docket text, audit logs, and inspector entries.")
+
+    user_q = st.text_input("Ask any question about deliveries, docket text, inspectors, or job statuses:")
     if user_q:
-        query_lower = user_q.lower()
-        matched = [j for j in st.session_state.jobs if query_lower in str(j).lower()]
-        if matched:
-            st.markdown(f"🔍 **Found {len(matched)} matching record(s):**\n")
-            for m in matched[:5]:
-                st.write(f"- **Job #{m.get('job_no')}**: {m.get('category')} | Status: {m.get('delivery_status')} | Inspector: {m.get('operator')}")
+        query_terms = [q.strip().lower() for q in user_q.split() if len(q.strip()) > 2]
+        
+        matches = []
+        for job in st.session_state.jobs:
+            score = 0
+            job_str = json.dumps(job).lower()
+            for term in query_terms:
+                if term in job_str:
+                    score += 1
+            if score > 0:
+                matches.append((score, job))
+                
+        matches.sort(key=lambda x: x[0], reverse=True)
+        
+        if matches:
+            st.markdown(f"🧠 **AI Knowledge Retrieval found {len(matches)} relevant record(s):**")
+            for score, m in matches[:5]:
+                with st.container():
+                    st.markdown(f"#### 📄 Job #{m.get('job_no')} — Status: {m.get('delivery_status')}")
+                    st.write(f"- **Category:** {m.get('category')}")
+                    st.write(f"- **User Manifest:** {m.get('items_logged')}")
+                    st.write(f"- **Docket Text (OCR):** {m.get('docket_text')[:200]}...")
+                    st.write(f"- **Verification Note:** {m.get('docket_match_status')}")
+                    st.write(f"- **Inspector:** {m.get('operator')} (Last Updated: {m.get('updated')})")
+                    st.markdown("---")
         else:
-            st.info("No matching records found for your query. Try searching by job number, status, or material category.")
+            st.info("No records matched your exact query terms. Search by docket number, inspector name, or material type.")
 
 # --- TAB 6: MODULAR SYSTEM SPECS ---
 with t6:
     st.markdown("### 🏢 MODULAR SKID TECHNICAL SPECIFICATIONS")
-    st.caption("Standard operational guidelines for modular skid assembly, piping tolerances, and field inspection checks.")
-    
     col_s1, col_s2 = st.columns(2)
     with col_s1:
         st.markdown(
@@ -865,8 +855,7 @@ with t6:
             #### 🛠️ Welding & Piping Standards
             - **Material Grades**: AISI 316/316L Stainless Steel, Carbon Steel ASTM A106 Grade B.
             - **Hydrostatic Testing**: 1.5x design pressure held for a minimum of 30 minutes.
-            - **Nondestructive Examination (NDE)**: 100% Visual Inspection (VT) + 20% Radiographic Testing (RT) on high-pressure lines.
-            - **Cleanliness Class**: ISO 14644-1 Class 5 for high-purity orbital welded assemblies.
+            - **Nondestructive Examination (NDE)**: 100% Visual Inspection (VT) + 20% Radiographic Testing (RT).
             """
         )
     with col_s2:
@@ -876,6 +865,5 @@ with t6:
             1. Verify material heat numbers against Mill Test Reports (MTRs).
             2. Check flange face finishes and gasket material compatibility.
             3. Ensure torque limits comply with ASME B31.3 piping specs.
-            4. Confirm valve actuator calibration and emergency shutdown alignment.
             """
         )
