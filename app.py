@@ -849,16 +849,33 @@ with t5:
         if matched:
             st.markdown(f"🔍 **Found {len(matched)} matching record(s):**\n")
             for m in matched[:5]:
-                st.write(f"- **Job #{m.get('job_no')}**: {m.get('category')} | Status: {m.get('delivery_status')}")
+                st.write(f"- **Job #{m.get('job_no')}**: {m.get('category')} | Status: {m.get('delivery_status')} | Inspector: {m.get('operator')}")
         else:
-            st.info("No direct database matches found.")
+            st.info("No matching records found for your query. Try searching by job number, status, or material category.")
 
 # --- TAB 6: MODULAR SYSTEM SPECS ---
 with t6:
-    st.markdown("### 🏢 MODULAR SYSTEM SPECIFICATIONS")
-    st.info("Standard operating limits and code compliance for Fabline Skid assemblies.")
-    st.markdown("""
-    - **Wet Pipe System:** Compliant with NFPA 13 guidelines. Nominal operating pressure: 175 PSI.
-    - **Dry Pipe System:** Nitrogen/Air pressurized system. Low-pressure differential design.
-    - **Pre-Action System:** Electric/Pneumatic release options for cleanroom and high-purity zones.
-    """)
+    st.markdown("### 🏢 MODULAR SKID TECHNICAL SPECIFICATIONS")
+    st.caption("Standard operational guidelines for modular skid assembly, piping tolerances, and field inspection checks.")
+    
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        st.markdown(
+            """
+            #### 🛠️ Welding & Piping Standards
+            - **Material Grades**: AISI 316/316L Stainless Steel, Carbon Steel ASTM A106 Grade B.
+            - **Hydrostatic Testing**: 1.5x design pressure held for a minimum of 30 minutes.
+            - **Nondestructive Examination (NDE)**: 100% Visual Inspection (VT) + 20% Radiographic Testing (RT) on high-pressure lines.
+            - **Cleanliness Class**: ISO 14644-1 Class 5 for high-purity orbital welded assemblies.
+            """
+        )
+    with col_s2:
+        st.markdown(
+            """
+            #### 📋 Inspection Checklists
+            1. Verify material heat numbers against Mill Test Reports (MTRs).
+            2. Check flange face finishes and gasket material compatibility.
+            3. Ensure torque limits comply with ASME B31.3 piping specs.
+            4. Confirm valve actuator calibration and emergency shutdown alignment.
+            """
+        )
